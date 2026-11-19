@@ -93,7 +93,8 @@ local function projectBox(character, camera)
 			local y = yi == 0 and -half.Y or half.Y
 			for zi = 0, 1 do
 				local z = zi == 0 and -half.Z or half.Z
-				local screen = Camera.project(camera, (boxCFrame * Vector3.new(x, y, z)).Position)
+				local corner = boxCFrame * Vector3.new(x, y, z)
+				local screen = Camera.project(camera, corner)
 				if not screen then
 					return nil
 				end

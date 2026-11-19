@@ -102,9 +102,11 @@ Both expose the same object surface (`Line`, `Rect`, `Text`, `Circle`), so eleme
 - A baseplate and a spawn at the origin.
 - Eight R15 dummies at 10, 25, 50, 100, 200, 350 and 500 studs, plus one behind spawn, each with a different health value.
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
-- The demo script in `StarterPlayerScripts`, with `IncludeNPCs = true` because the dummies are models rather than players.
+- A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players.
 
-Controls: **RightShift** toggles the ESP, **RightControl** toggles the visibility check. The output prints which backend was picked.
+Controls: **RightAlt** hides or shows the panel, and every row in it toggles the matching setting on the next frame. The panel footer shows the active backend and the target count.
+
+The panel is dev-only: nothing under `src/` requires it, so it is absent from `dist/Phasma.luau` and `dist/Phasma.rbxm`. `example/Phasma_Test.client.luau` is the standalone demo for releases and is no longer mapped into the place, since two ESP instances would draw everything twice.
 
 Rebuild the place with:
 
@@ -157,6 +159,7 @@ src/
     Math.luau  Color.luau
 example/Phasma_Test.client.luau
 dev/DummySpawner.server.luau
+dev/PhasmaDebug.client.luau
 build/                   darklua config, header, model project, build script
 ```
 

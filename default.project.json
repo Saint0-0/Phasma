@@ -45,7 +45,7 @@
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-        "PhasmaTest": { "$path": "example/Phasma_Test.client.luau" }
+        "PhasmaDebug": { "$path": "dev/PhasmaDebug.client.luau" }
       }
     }
   }
