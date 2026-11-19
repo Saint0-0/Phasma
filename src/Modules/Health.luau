@@ -29,6 +29,8 @@ function Health.New(ctx)
 	self.Text.OutlineColor = Constants.OutlineColor
 	self.Shown = 1
 	self.LastValue = nil
+	self.LastPercent = nil
+	self.Time = 0
 	return self
 end
 
@@ -71,6 +73,15 @@ function Health:Update(state)
 	local radius = width * 0.5
 	local centerX = x + radius
 
+	local fillTransparency = Alpha.apply(settings.Transparency, alpha)
+	self.Time = self.Time + (state.Delta or 0)
+	-- Below a quarter health the fill breathes, which pulls the eye to a
+	-- target that is about to die without adding another element.
+	if settings.Pulse and self.Shown < 0.25 then
+		local wave = (math.sin(self.Time * 6) + 1) * 0.5
+		fillTransparency = math.clamp(fillTransparency + wave * 0.4, 0, 1)
+	end
+
 	local backTransparency = Alpha.apply(settings.BackgroundTransparency, alpha)
 	self.Back.Position = Vector2.new(x, y)
 	self.Back.Size = Vector2.new(width, height)
@@ -82,7 +93,7 @@ function Health:Update(state)
 	self.Fill.Position = Vector2.new(x, y + height - fillHeight)
 	self.Fill.Size = Vector2.new(width, fillHeight)
 	self.Fill.Color = Color.health(self.Shown)
-	self.Fill.Transparency = Alpha.apply(settings.Transparency, alpha)
+	self.Fill.Transparency = fillTransparency
 	self.Fill.Filled = true
 	self.Fill.Visible = fillHeight > 0
 
@@ -96,7 +107,6 @@ function Health:Update(state)
 
 	if settings.Rounded and fillHeight > 0.5 and fillHeight >= width then
 		local fillColor = Color.health(self.Shown)
-		local fillTransparency = Alpha.apply(settings.Transparency, alpha)
 		cap(self.FillTop, centerX, y + height - fillHeight + radius, radius, fillColor, fillTransparency)
 		cap(self.FillBottom, centerX, y + height - radius, radius, fillColor, fillTransparency)
 	else
@@ -105,10 +115,20 @@ function Health:Update(state)
 	end
 
 	if settings.ShowText then
-		local value = math.floor(state.Health + 0.5)
-		if value ~= self.LastValue then
-			self.LastValue = value
-			self.Text.Text = tostring(value)
+		if settings.Percent then
+			local percent = math.floor(target * 100 + 0.5)
+			if percent ~= self.LastValue or not self.LastPercent then
+				self.LastValue = percent
+				self.LastPercent = true
+				self.Text.Text = string.format("%d%%", percent)
+			end
+		else
+			local value = math.floor(state.Health + 0.5)
+			if value ~= self.LastValue or self.LastPercent ~= false then
+				self.LastValue = value
+				self.LastPercent = false
+				self.Text.Text = tostring(value)
+			end
 		end
 		self.Text.TextSize = settings.TextSize
 		self.Text.Color = Color.health(self.Shown)

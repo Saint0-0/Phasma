@@ -89,6 +89,24 @@ function Object:Destroy()
 	end)
 end
 
+-- TextBounds follows Text/TextSize on the Drawing object. A build that has not
+-- refreshed it yet falls back to an estimate, which is close enough for a chip.
+function Object:Measure()
+	local raw = rawget(self, "_raw")
+	if raw then
+		local ok, bounds = pcall(function()
+			return raw.TextBounds
+		end)
+		if ok and typeof(bounds) == "Vector2" and bounds.X > 0 then
+			return bounds, true
+		end
+	end
+	local props = rawget(self, "_props")
+	local text = props.Text or ""
+	local textSize = props.TextSize or 13
+	return Vector2.new(#text * textSize * 0.5, textSize), false
+end
+
 function DrawingCanvas.available()
 	return Drawing ~= nil and type(Drawing.new) == "function"
 end

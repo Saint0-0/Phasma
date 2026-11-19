@@ -9,6 +9,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local TextService = game:GetService("TextService")
 
 local Constants = require("../../Constants")
 local Random = require("../../Utils/Random")
@@ -174,6 +175,20 @@ function Object:Destroy()
 		owner._objects[frame] = nil
 	end
 	frame:Destroy()
+end
+
+-- Rendered text size, used by the name and distance chips. TextService is the
+-- same measurement the label itself uses, so the chip fits on the first frame.
+function Object:Measure()
+	local props = rawget(self, "_props")
+	local text = props.Text or ""
+	local textSize = props.TextSize or 13
+	local ok, bounds =
+		pcall(TextService.GetTextSize, TextService, text, textSize, Constants.Font, Vector2.new(1000, 1000))
+	if ok and typeof(bounds) == "Vector2" then
+		return bounds, true
+	end
+	return Vector2.new(#text * textSize * 0.5, textSize), false
 end
 
 function GuiCanvas.new(security)

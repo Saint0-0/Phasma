@@ -6,7 +6,7 @@ The library is modular: each element is its own module, the rendering backend is
 
 ## Status
 
-`v0.2.0` is the modernisation pass: corner-bracket boxes with a soft fill, a smoothed capsule health bar, distance fade, optional joint dots, an allocation-free render path and security defaults. The roadmap lives in `plan.md`.
+`v0.3.0` is the second polish pass: team colours, a soft box glow, measured text chips behind the name and distance, a low-health pulse and percentage text. The dev panel now has a live RGB colour panel. The roadmap lives in `plan.md`.
 
 ## Load it
 
@@ -73,6 +73,7 @@ Global:
 | `VisibilityInterval` | `0.12` | Seconds between visibility raycasts for one target. |
 | `IgnoreLocal` | `true` | Keeps the local player out of the list. |
 | `IncludeNPCs` | `false` | Also draws humanoid models that are not player characters. |
+| `TeamColor` | `true` | Players with a `Team` use its colour for the box, name, tracer, skeleton and head dot. |
 | `FadeWithDistance` | `true` | Far targets dim toward `FadeFloor` instead of staying at full brightness. |
 | `FadeFloor` | `0.72` | Alpha at `MaxDistance`; `1` disables the effect. |
 
@@ -80,10 +81,10 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 
 | Element | Keys |
 | --- | --- |
-| `Box` | `Enabled`, `Style` (`"Corners"`, `"Full"`, `"Both"`), `Color`, `Thickness`, `Transparency`, `Filled`, `FillTransparency`, `CornerScale`, `CornerMin`, `CornerMax` |
-| `Name` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `UseDisplayName`, `Offset` |
-| `Distance` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `Offset`, `Suffix`, `Scale` |
-| `Health` | `Enabled`, `Width`, `Gap`, `Transparency`, `Background`, `BackgroundTransparency`, `ShowText`, `TextSize`, `Smoothing`, `Rounded` |
+| `Box` | `Enabled`, `Style` (`"Corners"`, `"Full"`, `"Both"`), `Color`, `Thickness`, `Transparency`, `Filled`, `FillTransparency`, `CornerScale`, `CornerMin`, `CornerMax`, `Glow`, `GlowThickness`, `GlowTransparency` |
+| `Name` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `UseDisplayName`, `Offset`, `Background`, `BackgroundColor`, `BackgroundTransparency`, `Padding` |
+| `Distance` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `Offset`, `Suffix`, `Scale`, `Background`, `BackgroundColor`, `BackgroundTransparency`, `Padding` |
+| `Health` | `Enabled`, `Width`, `Gap`, `Transparency`, `Background`, `BackgroundTransparency`, `ShowText`, `Percent`, `TextSize`, `Smoothing`, `Rounded`, `Pulse` |
 | `Tracer` | `Enabled`, `Color`, `Thickness`, `Transparency`, `From` (`"Bottom"`, `"Center"`, `"Mouse"`) |
 | `Skeleton` | `Enabled`, `Color`, `Thickness`, `Transparency`, `Joints`, `JointRadius` |
 | `HeadDot` | `Enabled`, `Color`, `Radius`, `Filled`, `Transparency` |
@@ -94,6 +95,14 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 `Health.Smoothing` is the convergence speed of the fill; `0` snaps instantly. `Health.Rounded` adds capsule end caps, which work identically on both backends because they are drawn as filled circles rather than UI corners.
 
 `Box.Style = "Corners"` is the default look: four brackets over a very faint fill. `"Full"` is a plain outline, and `"Both"` combines them. `CornerScale` sets the bracket length as a fraction of the shorter box side, clamped by `CornerMin` and `CornerMax`.
+
+`Box.Glow` adds a second, wider outline behind the box. `GlowThickness` and `GlowTransparency` shape it; keep the transparency high so it reads as light rather than a second box.
+
+`Name.Background` and `Distance.Background` draw a chip behind the text. The chip is measured from the rendered string through `TextService` on the Gui backend and `TextBounds` on the Drawing backend, so it hugs the label on both. `Padding` is the inset on each side.
+
+When `TeamColor` is on and a player has a `Team`, the team colour replaces the configured colour on the box, name, tracer, skeleton and head dot. NPCs and teamless players keep the settings colour.
+
+`Health.Percent` shows `0-100%` instead of the raw health value, and only applies while `ShowText` is on. `Health.Pulse` breathes the fill below a quarter health.
 
 ## Security
 
@@ -132,6 +141,7 @@ The render path is built to stay flat as the target count grows:
 - NPCs are tracked by `DescendantAdded` / `DescendantRemoving` events. A full `workspace:GetDescendants()` walk only runs as an 8-second safety net.
 - Skeleton joint dots are created on first use, so the default settings do not allocate 20 extra objects per target.
 - `Distance` and health text only rebuild their strings when the value changes.
+- Text chips only re-measure when the string or text size changes, so the common frame does no text measurement at all.
 
 ## The test place
 
@@ -141,6 +151,7 @@ The render path is built to stay flat as the target count grows:
 - Eight R15 dummies at 10, 25, 50, 100, 200, 350 and 500 studs, plus one behind spawn, each with a different health value.
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
 - A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players.
+- A second **COLOURS** panel beside it: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline and the health bar background are included.
 
 Controls: **RightAlt** hides or shows the panel, and every row in it toggles the matching setting on the next frame. The panel footer shows the active backend, the target count and the live engine count.
 
@@ -172,7 +183,7 @@ tools\selene.exe example
 tools\selene.exe dev
 
 # bundle dist/Phasma.luau + dist/Phasma.rbxm
-tools\lune.exe run build\init.luau 0.2.0
+tools\lune.exe run build\init.luau 0.3.0
 
 # live loop: rebuild the bundle on save, and serve the place
 tools\darklua.exe process src/Init.luau dist/Phasma.luau -c build/darklua.json -w

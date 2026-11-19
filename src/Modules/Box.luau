@@ -16,6 +16,8 @@ Box.__index = Box
 function Box.New(ctx)
 	local self = setmetatable({}, Box)
 	self.Settings = ctx.Settings
+	-- Created first so the wide, faint outline renders behind the box.
+	self.Glow = ctx.Canvas:Rect(ctx.ZIndex)
 	self.Full = ctx.Canvas:Rect(ctx.ZIndex)
 	self.Fill = ctx.Canvas:Rect(ctx.ZIndex)
 	self.Corners = table.create(8)
@@ -43,9 +45,21 @@ function Box:Update(state)
 
 	local box = state.Box
 	local alpha = state.Alpha
-	local color = settings.Color
+	local color = state.TeamColor or settings.Color
 	local thickness = settings.Thickness
 	local transparency = Alpha.apply(settings.Transparency, alpha)
+
+	if settings.Glow then
+		self.Glow.Position = box.Position
+		self.Glow.Size = box.Size
+		self.Glow.Color = color
+		self.Glow.Thickness = settings.GlowThickness or 3
+		self.Glow.Transparency = Alpha.apply(settings.GlowTransparency or 0.88, alpha)
+		self.Glow.Filled = false
+		self.Glow.Visible = true
+	else
+		self.Glow.Visible = false
+	end
 
 	if settings.Filled then
 		self.Fill.Position = box.Position
@@ -113,6 +127,7 @@ function Box:Update(state)
 end
 
 function Box:Hide()
+	self.Glow.Visible = false
 	self.Full.Visible = false
 	self.Fill.Visible = false
 	for _, line in ipairs(self.Corners) do
@@ -121,6 +136,7 @@ function Box:Hide()
 end
 
 function Box:Destroy()
+	self.Glow:Destroy()
 	self.Full:Destroy()
 	self.Fill:Destroy()
 	for _, line in ipairs(self.Corners) do

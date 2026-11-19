@@ -39,7 +39,7 @@ function Tracer:Update(state)
 
 	self.Line.From = originFor(settings.From, camera.ViewportSize)
 	self.Line.To = Vector2.new(state.Box.Center.X, state.Box.Position.Y + state.Box.Size.Y)
-	self.Line.Color = settings.Color
+	self.Line.Color = state.TeamColor or settings.Color
 	self.Line.Thickness = settings.Thickness
 	self.Line.Transparency = Alpha.apply(settings.Transparency, state.Alpha)
 	self.Line.Visible = true

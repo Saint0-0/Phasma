@@ -27,7 +27,7 @@ function HeadDot:Update(state)
 
 	self.Dot.Position = state.Screen
 	self.Dot.Radius = settings.Radius
-	self.Dot.Color = settings.Color
+	self.Dot.Color = state.TeamColor or settings.Color
 	self.Dot.Filled = settings.Filled
 	self.Dot.Thickness = 1
 	self.Dot.Transparency = Alpha.apply(settings.Transparency, state.Alpha)

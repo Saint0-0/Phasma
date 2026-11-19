@@ -39,7 +39,7 @@ function Skeleton:Update(state)
 	end
 
 	local transparency = Alpha.apply(settings.Transparency, state.Alpha)
-	local color = settings.Color
+	local color = state.TeamColor or settings.Color
 	local thickness = settings.Thickness
 	local count = state.BoneCount
 

@@ -21,6 +21,9 @@ local Defaults = {
 	VisibilityInterval = 0.12,
 	IgnoreLocal = true,
 	IncludeNPCs = false,
+	-- Players with a Team take their TeamColor for the box, name, tracer,
+	-- skeleton and head dot. NPCs and teamless players keep the settings colours.
+	TeamColor = true,
 	-- Far targets dim slightly instead of staying at full brightness.
 	FadeWithDistance = true,
 	FadeFloor = 0.72,
@@ -38,6 +41,10 @@ local Defaults = {
 		CornerScale = 0.22,
 		CornerMin = 5,
 		CornerMax = 16,
+		-- A wide, faint outline behind the box reads as a soft glow.
+		Glow = true,
+		GlowThickness = 3,
+		GlowTransparency = 0.88,
 	},
 
 	Name = {
@@ -49,6 +56,10 @@ local Defaults = {
 		OutlineTransparency = 0.45,
 		UseDisplayName = true,
 		Offset = 4,
+		Background = true,
+		BackgroundColor = Color3.fromRGB(10, 12, 16),
+		BackgroundTransparency = 0.55,
+		Padding = 4,
 	},
 
 	Distance = {
@@ -61,6 +72,10 @@ local Defaults = {
 		Offset = 3,
 		Suffix = "m",
 		Scale = 1,
+		Background = true,
+		BackgroundColor = Color3.fromRGB(10, 12, 16),
+		BackgroundTransparency = 0.55,
+		Padding = 4,
 	},
 
 	Health = {
@@ -71,10 +86,13 @@ local Defaults = {
 		Background = Color3.fromRGB(10, 12, 16),
 		BackgroundTransparency = 0.65,
 		ShowText = false,
+		Percent = false,
 		TextSize = 11,
 		-- Higher converges faster. 0 disables smoothing.
 		Smoothing = 14,
 		Rounded = true,
+		-- Breathe the fill when the target is below a quarter health.
+		Pulse = true,
 	},
 
 	Tracer = {

@@ -52,7 +52,7 @@ local function toggleRow(parent, order, label, get, set)
 	local row = Instance.new("TextButton")
 	row.Name = label
 	row.LayoutOrder = order
-	row.Size = UDim2.new(1, 0, 0, 24)
+	row.Size = UDim2.new(1, 0, 0, 22)
 	row.BackgroundColor3 = COLORS.Row
 	row.BorderSizePixel = 0
 	row.AutoButtonColor = false
@@ -124,7 +124,7 @@ local function distanceRow(parent, order)
 	holder.Name = "MaxDistance"
 	holder.LayoutOrder = order
 	holder.BackgroundTransparency = 1
-	holder.Size = UDim2.new(1, 0, 0, 24)
+	holder.Size = UDim2.new(1, 0, 0, 22)
 	holder.Parent = parent
 
 	local layout = Instance.new("UIListLayout")
@@ -173,7 +173,7 @@ local function sectionLabel(parent, order, text)
 	local label = Instance.new("TextLabel")
 	label.BackgroundTransparency = 1
 	label.LayoutOrder = order
-	label.Size = UDim2.new(1, 0, 0, 16)
+	label.Size = UDim2.new(1, 0, 0, 14)
 	label.Font = Enum.Font.GothamMedium
 	label.TextSize = 10
 	label.TextColor3 = COLORS.Muted
@@ -204,7 +204,7 @@ gui.Parent = playerGui
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.Position = UDim2.fromOffset(16, 16)
-panel.Size = UDim2.fromOffset(248, 464)
+panel.Size = UDim2.fromOffset(248, 616)
 panel.BackgroundColor3 = COLORS.Panel
 panel.BorderSizePixel = 0
 panel.Active = true
@@ -240,7 +240,7 @@ title.Name = "Title"
 title.LayoutOrder = nextOrder()
 title.BackgroundTransparency = 1
 title.Active = true
-title.Size = UDim2.new(1, 0, 0, 24)
+title.Size = UDim2.new(1, 0, 0, 22)
 title.Parent = panel
 
 local titleLabel = Instance.new("TextLabel")
@@ -256,7 +256,7 @@ titleLabel.Parent = title
 local hint = Instance.new("TextLabel")
 hint.AnchorPoint = Vector2.new(1, 0.5)
 hint.Position = UDim2.fromScale(1, 0.5)
-hint.Size = UDim2.fromOffset(44, 24)
+hint.Size = UDim2.fromOffset(44, 22)
 hint.BackgroundTransparency = 1
 hint.Font = Enum.Font.GothamMedium
 hint.TextSize = 10
@@ -348,6 +348,44 @@ end, function(value)
 	esp.Settings.IncludeNPCs = value
 end)
 
+sectionLabel(panel, nextOrder(), "STYLE")
+toggleRow(panel, nextOrder(), "Team colours", function()
+	return esp.Settings.TeamColor
+end, function(value)
+	esp.Settings.TeamColor = value
+end)
+toggleRow(panel, nextOrder(), "Box glow", function()
+	return esp.Settings.Box.Glow
+end, function(value)
+	esp.Settings.Box.Glow = value
+end)
+toggleRow(panel, nextOrder(), "Health pulse", function()
+	return esp.Settings.Health.Pulse
+end, function(value)
+	esp.Settings.Health.Pulse = value
+end)
+toggleRow(panel, nextOrder(), "Health %", function()
+	return esp.Settings.Health.Percent
+end, function(value)
+	esp.Settings.Health.Percent = value
+	esp.Settings.Health.ShowText = value
+end)
+toggleRow(panel, nextOrder(), "Name chip", function()
+	return esp.Settings.Name.Background
+end, function(value)
+	esp.Settings.Name.Background = value
+end)
+toggleRow(panel, nextOrder(), "Distance chip", function()
+	return esp.Settings.Distance.Background
+end, function(value)
+	esp.Settings.Distance.Background = value
+end)
+toggleRow(panel, nextOrder(), "Joint dots", function()
+	return esp.Settings.Skeleton.Joints
+end, function(value)
+	esp.Settings.Skeleton.Joints = value
+end)
+
 sectionLabel(panel, nextOrder(), "ELEMENTS")
 for _, name in ipairs(ELEMENTS) do
 	toggleRow(panel, nextOrder(), name, function()
@@ -361,6 +399,315 @@ sectionLabel(panel, nextOrder(), "MAX DISTANCE")
 distanceRow(panel, nextOrder())
 
 status.Text = "ready"
+
+-- A second panel keeps the main list short. Chips select an element and one
+-- set of RGB sliders edits that element's colour in the live settings table.
+local COLOUR_TARGETS = {
+	{ Name = "Box", Table = "Box", Key = "Color" },
+	{ Name = "Name", Table = "Name", Key = "Color" },
+	{ Name = "Distance", Table = "Distance", Key = "Color" },
+	{ Name = "Tracer", Table = "Tracer", Key = "Color" },
+	{ Name = "Skeleton", Table = "Skeleton", Key = "Color" },
+	{ Name = "HeadDot", Table = "HeadDot", Key = "Color" },
+	{ Name = "Health bg", Table = "Health", Key = "Background" },
+	{ Name = "HL fill", Table = "Highlight", Key = "Fill" },
+	{ Name = "HL outline", Table = "Highlight", Key = "Outline" },
+}
+
+local colours = Instance.new("Frame")
+colours.Name = "Colours"
+colours.Position = UDim2.fromOffset(276, 16)
+colours.Size = UDim2.fromOffset(268, 288)
+colours.BackgroundColor3 = COLORS.Panel
+colours.BorderSizePixel = 0
+colours.Active = true
+colours.Parent = gui
+rounded(colours, 8)
+
+local colourStroke = Instance.new("UIStroke")
+colourStroke.Color = COLORS.Stroke
+colourStroke.Thickness = 1
+colourStroke.Parent = colours
+
+local colourPadding = Instance.new("UIPadding")
+colourPadding.PaddingTop = UDim.new(0, 8)
+colourPadding.PaddingBottom = UDim.new(0, 8)
+colourPadding.PaddingLeft = UDim.new(0, 8)
+colourPadding.PaddingRight = UDim.new(0, 8)
+colourPadding.Parent = colours
+
+local colourLayout = Instance.new("UIListLayout")
+colourLayout.Padding = UDim.new(0, 2)
+colourLayout.SortOrder = Enum.SortOrder.LayoutOrder
+colourLayout.Parent = colours
+
+local colourOrder = 0
+local function nextColourOrder()
+	colourOrder = colourOrder + 1
+	return colourOrder
+end
+
+local colourTitle = Instance.new("TextLabel")
+colourTitle.Name = "Title"
+colourTitle.LayoutOrder = nextColourOrder()
+colourTitle.BackgroundTransparency = 1
+colourTitle.Active = true
+colourTitle.Size = UDim2.new(1, 0, 0, 20)
+colourTitle.Font = Enum.Font.GothamBold
+colourTitle.TextSize = 11
+colourTitle.TextColor3 = COLORS.Text
+colourTitle.TextXAlignment = Enum.TextXAlignment.Left
+colourTitle.Text = "COLOURS"
+colourTitle.Parent = colours
+
+local chipHolder = Instance.new("Frame")
+chipHolder.LayoutOrder = nextColourOrder()
+chipHolder.BackgroundTransparency = 1
+chipHolder.Size = UDim2.new(1, 0, 0, 126)
+chipHolder.Parent = colours
+
+local chipGrid = Instance.new("UIGridLayout")
+chipGrid.CellSize = UDim2.new(0.5, -3, 0, 22)
+chipGrid.CellPadding = UDim2.fromOffset(6, 4)
+chipGrid.SortOrder = Enum.SortOrder.LayoutOrder
+chipGrid.Parent = chipHolder
+
+local preview = Instance.new("Frame")
+preview.LayoutOrder = nextColourOrder()
+preview.Size = UDim2.new(1, 0, 0, 28)
+preview.BackgroundColor3 = Color3.new(1, 1, 1)
+preview.BorderSizePixel = 0
+preview.Parent = colours
+rounded(preview, 6)
+
+local previewStroke = Instance.new("UIStroke")
+previewStroke.Color = COLORS.Stroke
+previewStroke.Thickness = 1
+previewStroke.Parent = preview
+
+local previewLabel = Instance.new("TextLabel")
+previewLabel.BackgroundTransparency = 1
+previewLabel.Size = UDim2.fromScale(1, 1)
+previewLabel.Font = Enum.Font.GothamBold
+previewLabel.TextSize = 11
+previewLabel.TextColor3 = COLORS.KnobOn
+previewLabel.Text = "#FFFFFF"
+previewLabel.Parent = preview
+
+local CHANNELS = { "R", "G", "B" }
+local sliders = {}
+local selected = 1
+local refreshColour
+local activeSlider = nil
+
+local function channelColor(index)
+	if index == 1 then
+		return Color3.fromRGB(240, 96, 96)
+	elseif index == 2 then
+		return Color3.fromRGB(110, 214, 130)
+	end
+	return Color3.fromRGB(110, 160, 255)
+end
+
+for index, channel in ipairs(CHANNELS) do
+	local row = Instance.new("Frame")
+	row.LayoutOrder = nextColourOrder()
+	row.BackgroundTransparency = 1
+	row.Size = UDim2.new(1, 0, 0, 22)
+	row.Parent = colours
+
+	local name = Instance.new("TextLabel")
+	name.BackgroundTransparency = 1
+	name.Size = UDim2.fromOffset(14, 22)
+	name.Font = Enum.Font.GothamMedium
+	name.TextSize = 11
+	name.TextColor3 = COLORS.Muted
+	name.Text = channel
+	name.Parent = row
+
+	local track = Instance.new("TextButton")
+	track.Position = UDim2.fromOffset(18, 0)
+	track.Size = UDim2.new(1, -62, 1, 0)
+	track.BackgroundTransparency = 1
+	track.Text = ""
+	track.AutoButtonColor = false
+	track.Parent = row
+
+	local rail = Instance.new("Frame")
+	rail.AnchorPoint = Vector2.new(0, 0.5)
+	rail.Position = UDim2.fromScale(0, 0.5)
+	rail.Size = UDim2.new(1, 0, 0, 6)
+	rail.BackgroundColor3 = COLORS.Row
+	rail.BorderSizePixel = 0
+	rail.Parent = track
+	rounded(rail, 3)
+
+	local fill = Instance.new("Frame")
+	fill.AnchorPoint = Vector2.new(0, 0.5)
+	fill.Position = UDim2.fromScale(0, 0.5)
+	fill.Size = UDim2.fromScale(0, 1)
+	fill.BackgroundColor3 = channelColor(index)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+	rounded(fill, 3)
+
+	local knob = Instance.new("Frame")
+	knob.AnchorPoint = Vector2.new(0.5, 0.5)
+	knob.Position = UDim2.fromScale(0, 0.5)
+	knob.Size = UDim2.fromOffset(10, 10)
+	knob.BackgroundColor3 = COLORS.Text
+	knob.BorderSizePixel = 0
+	knob.Parent = track
+	rounded(knob, 5)
+
+	local value = Instance.new("TextLabel")
+	value.AnchorPoint = Vector2.new(1, 0.5)
+	value.Position = UDim2.fromScale(1, 0.5)
+	value.Size = UDim2.fromOffset(36, 22)
+	value.BackgroundTransparency = 1
+	value.Font = Enum.Font.GothamMedium
+	value.TextSize = 10
+	value.TextColor3 = COLORS.Text
+	value.TextXAlignment = Enum.TextXAlignment.Right
+	value.Text = "0"
+	value.Parent = row
+
+	local function apply(input)
+		local width = track.AbsoluteSize.X
+		if width <= 0 then
+			return
+		end
+		local rel = math.clamp((input.Position.X - track.AbsolutePosition.X) / width, 0, 1)
+		local spec = COLOUR_TARGETS[selected]
+		local settings = esp.Settings[spec.Table]
+		local color = settings[spec.Key]
+		local r, g, b = color.R, color.G, color.B
+		if index == 1 then
+			r = rel
+		elseif index == 2 then
+			g = rel
+		else
+			b = rel
+		end
+		settings[spec.Key] = Color3.new(r, g, b)
+		refreshColour()
+	end
+
+	track.InputBegan:Connect(function(input)
+		if
+			input.UserInputType == Enum.UserInputType.MouseButton1
+			or input.UserInputType == Enum.UserInputType.Touch
+		then
+			activeSlider = apply
+			apply(input)
+		end
+	end)
+
+	sliders[index] = {
+		Refresh = function()
+			local spec = COLOUR_TARGETS[selected]
+			local color = esp.Settings[spec.Table][spec.Key]
+			local amount = index == 1 and color.R or (index == 2 and color.G or color.B)
+			fill.Size = UDim2.fromScale(amount, 1)
+			knob.Position = UDim2.fromScale(amount, 0.5)
+			value.Text = tostring(math.floor(amount * 255 + 0.5))
+		end,
+	}
+end
+
+UserInputService.InputChanged:Connect(function(input)
+	if not activeSlider then
+		return
+	end
+	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+		activeSlider(input)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		activeSlider = nil
+	end
+end)
+
+refreshColour = function()
+	local spec = COLOUR_TARGETS[selected]
+	local color = esp.Settings[spec.Table][spec.Key]
+	preview.BackgroundColor3 = color
+	local r = math.floor(color.R * 255 + 0.5)
+	local g = math.floor(color.G * 255 + 0.5)
+	local b = math.floor(color.B * 255 + 0.5)
+	previewLabel.Text = string.format("#%02X%02X%02X", r, g, b)
+	local luma = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
+	previewLabel.TextColor3 = luma > 0.55 and COLORS.KnobOn or COLORS.Text
+	for _, slider in ipairs(sliders) do
+		slider.Refresh()
+	end
+end
+
+local chips = {}
+
+local function selectChip(index)
+	selected = index
+	for chipIndex, chip in ipairs(chips) do
+		local on = chipIndex == index
+		chip.BackgroundColor3 = on and COLORS.Accent or COLORS.Row
+		chip.TextColor3 = on and COLORS.KnobOn or COLORS.Text
+	end
+	refreshColour()
+end
+
+for index, spec in ipairs(COLOUR_TARGETS) do
+	local chip = Instance.new("TextButton")
+	chip.Name = spec.Name
+	chip.LayoutOrder = index
+	chip.BackgroundColor3 = COLORS.Row
+	chip.BorderSizePixel = 0
+	chip.AutoButtonColor = false
+	chip.Font = Enum.Font.GothamMedium
+	chip.TextSize = 10
+	chip.TextColor3 = COLORS.Text
+	chip.Text = spec.Name
+	chip.Parent = chipHolder
+	rounded(chip, 4)
+	chip.MouseButton1Click:Connect(function()
+		selectChip(index)
+	end)
+	chips[index] = chip
+end
+
+selectChip(1)
+
+-- The colour panel gets its own drag handle.
+local colourDragging = false
+local colourStart = nil
+local colourOrigin = nil
+
+colourTitle.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		colourDragging = true
+		colourStart = input.Position
+		colourOrigin = colours.Position
+	end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+	if colourDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - colourStart
+		colours.Position = UDim2.new(
+			colourOrigin.X.Scale,
+			colourOrigin.X.Offset + delta.X,
+			colourOrigin.Y.Scale,
+			colourOrigin.Y.Offset + delta.Y
+		)
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		colourDragging = false
+	end
+end)
 
 -- The entry map is internal; a dev panel may read it for a live count.
 local elapsed = 0

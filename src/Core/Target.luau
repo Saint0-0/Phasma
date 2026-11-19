@@ -139,6 +139,8 @@ function Target.newState()
 		Alpha = 1,
 		Delta = 0,
 		Visible = true,
+		-- Resolved once per frame; nil means "use the element colour".
+		TeamColor = nil,
 	}
 end
 
@@ -364,6 +366,14 @@ function Target.build(entry, name, player, camera, origin, settings)
 	state.Health = humanoid.Health
 	state.MaxHealth = humanoid.MaxHealth
 	state.Screen = headScreen or state.Box.Center
+
+	-- A team colour overrides the element colours for the box, name, tracer,
+	-- skeleton and head dot. NPCs and teamless players keep the settings colour.
+	if settings.TeamColor and player and player.Team then
+		state.TeamColor = player.Team.TeamColor.Color
+	else
+		state.TeamColor = nil
+	end
 
 	if settings.Skeleton and settings.Skeleton.Enabled then
 		state.BoneCount, state.PointCount = collectBones(state, character, camera, entry.Rig)
