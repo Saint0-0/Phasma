@@ -16,12 +16,16 @@ local esp = Phasma:CreateESP({
 	VisibilityCheck = false,
 	IncludeNPCs = true, -- the test dummies are humanoid models, not players
 
-	-- Target transitions: fade/pop/slide in, fade out, tracer draw-on and
-	-- arrow slide. Element toggles stay instant.
+	-- Target transitions: fade, box pop, chip slide, corner sweep, tracer
+	-- draw-on and arrow slide. Every channel has its own switch; element
+	-- toggles stay instant.
 	Animations = {
 		Enabled = true,
-		Speed = 12,
-		Slide = 8,
+		Speed = 1,
+		Fade = true,
+		Pop = true,
+		Slide = true,
+		Sweep = true,
 		Tracer = true,
 		Arrow = true,
 	},

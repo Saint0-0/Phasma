@@ -40,7 +40,10 @@ function Direction:Update(state)
 	direction = direction.Unit
 
 	local size = settings.Size or 6
-	local origin = Vector2.new(box.Center.X, box.Position.Y - (settings.Offset or 4))
+	-- The marker shares the name chip's slide so the top of the target reads
+	-- as one group while it settles.
+	local slide = state.Anim and state.Anim.SlideOffset or 0
+	local origin = Vector2.new(box.Center.X, box.Position.Y - (settings.Offset or 4) - slide * 0.6)
 	local tip = origin + direction * size
 	local back = origin - direction * size * 0.2
 	local perpendicular = Vector2.new(-direction.Y, direction.X)

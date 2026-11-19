@@ -38,15 +38,16 @@ function Arrow:Update(state)
 		return
 	end
 
-	local progress = state.Anim and state.Anim.Arrow or 1
+	local anim = state.Anim
+	local progress = anim and (anim.ArrowEased or anim.Arrow) or 1
 	if progress <= 0.01 then
 		self:Hide()
 		return
 	end
 
 	local viewport = camera.ViewportSize
-	local size = settings.Size or 9
-	local inset = (settings.Offset or 16) + size
+	local baseSize = settings.Size or 9
+	local inset = (settings.Offset or 16) + baseSize
 	-- A viewport smaller than the inset cannot host the chevron. Clamping with
 	-- max < min would throw while the camera is still settling after a join.
 	if viewport.X <= inset * 2 or viewport.Y <= inset * 2 then
@@ -73,6 +74,9 @@ function Arrow:Update(state)
 	local entryPoint = tip + direction * (settings.Offset or 16)
 	tip = entryPoint + (tip - entryPoint) * progress
 
+	-- The chevron also grows from 65% as it slides in, so it lands rather
+	-- than simply stopping.
+	local size = baseSize * (0.65 + 0.35 * progress)
 	local perpendicular = Vector2.new(-direction.Y, direction.X)
 	local back = tip - direction * size
 	local left = back + perpendicular * size * 0.6

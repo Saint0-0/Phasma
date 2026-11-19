@@ -367,6 +367,32 @@ function ESP:_ensureEntry(owner, character, isObject)
 	return entry
 end
 
+-- Replays the entrance animations when a target crosses the viewport edge.
+-- The tracer redraws on re-entry, but only after the target has been away for
+-- a moment, so a box wobbling on the edge cannot restart it every frame.
+local function resetEdgeAnims(entry, settings, state, now)
+	local animations = settings.Animations
+	if not animations or not animations.Enabled then
+		entry.WasOffscreen = state.Offscreen
+		return
+	end
+
+	local wasOffscreen = entry.WasOffscreen
+	if state.Offscreen then
+		if not wasOffscreen then
+			entry.OffscreenAt = now
+			if animations.Arrow ~= false then
+				entry.Anim.Arrow = 0
+			end
+		end
+	elseif wasOffscreen and now - (entry.OffscreenAt or 0) >= 0.2 then
+		if animations.Tracer ~= false then
+			entry.Anim.Tracer = 0
+		end
+	end
+	entry.WasOffscreen = state.Offscreen
+end
+
 function ESP:_drawHumanoid(owner, character, player, camera, origin, settings, localCharacter, delta, now)
 	local entry = self:_ensureEntry(owner, character, false)
 	if not entry then
@@ -388,21 +414,7 @@ function ESP:_drawHumanoid(owner, character, player, camera, origin, settings, l
 			return false
 		end
 		entry.NextUpdate = state.Distance > detailDistance and (now + interval) or 0
-
-		-- Entering the off-screen state is when the arrow should slide in;
-		-- otherwise it would already be at full progress from its on-screen
-		-- lifetime and would snap into place.
-		local animations = settings.Animations
-		if
-			animations
-			and animations.Enabled
-			and animations.Arrow ~= false
-			and state.Offscreen
-			and not entry.WasOffscreen
-		then
-			entry.Anim.Arrow = 0
-		end
-		entry.WasOffscreen = state.Offscreen
+		resetEdgeAnims(entry, settings, state, now)
 	end
 
 	entry.Retiring = false
@@ -435,7 +447,7 @@ function ESP:_drawHumanoid(owner, character, player, camera, origin, settings, l
 	return true
 end
 
-function ESP:_drawObject(owner, object, camera, origin, settings, delta)
+function ESP:_drawObject(owner, object, camera, origin, settings, delta, now)
 	local entry = self:_ensureEntry(owner, object, true)
 	if not entry then
 		return false
@@ -451,6 +463,7 @@ function ESP:_drawObject(owner, object, camera, origin, settings, delta)
 	entry.Retiring = false
 	state.Visible = true
 	state.Occluded = false
+	resetEdgeAnims(entry, settings, state, now)
 
 	entry:StepAnim(delta, settings)
 	entry:Draw(state)
@@ -552,7 +565,7 @@ function ESP:Render(delta)
 		if selected then
 			local ok
 			if record.Kind == "Object" then
-				ok = self:_drawObject(owner, record.Object, camera, origin, settings, delta)
+				ok = self:_drawObject(owner, record.Object, camera, origin, settings, delta, now)
 			else
 				ok = self:_drawHumanoid(
 					owner,

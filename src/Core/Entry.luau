@@ -58,21 +58,27 @@ local function newEntry(esp, owner, character, order)
 	self.Visible = true
 	self.VisibleAt = 0
 	self.WasOffscreen = false
+	self.OffscreenAt = 0
 
 	local animConfig = esp.Settings.Animations
-	local pop = 0
-	if animConfig and animConfig.Enabled then
-		pop = animConfig.Pop or 0.06
-	end
+	local animated = animConfig and animConfig.Enabled
 
+	-- Each channel is a raw 0..1 track. The eased display values below it are
+	-- recomputed every frame in StepAnim, so the modules never apply easing.
+	local start = animated and 0 or 1
 	self.Anim = {
-		Alpha = 0,
-		Slide = 0,
-		-- Start slightly shrunk so the entry settles into place.
-		Scale = 1 - pop,
-		Tracer = 0,
-		Arrow = 0,
-		SlideOffset = animConfig and animConfig.Enabled and (animConfig.Slide or 8) or 0,
+		Fade = start,
+		Pop = start,
+		Slide = start,
+		Sweep = animated and 0 or 1,
+		Tracer = start,
+		Arrow = start,
+		-- Display values consumed by the element modules.
+		Scale = 1,
+		SlideOffset = 0,
+		SweepEased = animated and 0 or 1,
+		TracerEased = start,
+		ArrowEased = start,
 	}
 
 	self.State = Target.newState()
@@ -126,35 +132,93 @@ function Entry:Valid()
 	return self.Humanoid.Parent ~= nil and self.Root.Parent ~= nil and self.Head.Parent ~= nil
 end
 
+-- Scales a base duration by the global speed multiplier. A multiplier of 0
+-- (or less) collapses every channel to an instant snap.
+local function duration(config, base)
+	local speed = config.Speed
+	if speed == nil then
+		speed = 1
+	end
+	if speed <= 0 then
+		return 0
+	end
+	return base / speed
+end
+
 -- Steps the target-level transition. Returns false once a retiring entry has
 -- faded out, which tells the caller to hide it for the rest of the frame.
 function Entry:StepAnim(delta, settings)
 	local anim = self.Anim
 	local config = settings.Animations
 	local target = self.Retiring and 0 or 1
+	local on = config and config.Enabled
 
-	if config and config.Enabled then
-		local speed = config.Speed or 12
-		anim.Alpha = Anim.approach(anim.Alpha, target, speed, delta)
-		anim.Slide = Anim.approach(anim.Slide, 1, speed, delta)
-		anim.Scale = Anim.approach(anim.Scale, 1, speed, delta)
-		anim.Tracer = Anim.approach(anim.Tracer, config.Tracer ~= false and target or 1, speed, delta)
-		anim.Arrow = Anim.approach(anim.Arrow, config.Arrow ~= false and target or 1, speed, delta)
-		anim.SlideOffset = (1 - anim.Slide) * (config.Slide or 8)
+	if on then
+		local fadeDuration = duration(config, config.FadeDuration or 0.25)
+		local popDuration = duration(config, config.PopDuration or 0.34)
+		local slideDuration = duration(config, config.SlideDuration or 0.3)
+		local sweepDuration = duration(config, config.SweepDuration or 0.36)
+		local tracerDuration = duration(config, config.TracerDuration or 0.5)
+		local arrowDuration = duration(config, config.ArrowDuration or 0.32)
+
+		if config.Fade ~= false then
+			anim.Fade = Anim.step(anim.Fade, target, fadeDuration, delta)
+		else
+			anim.Fade = target
+		end
+		-- Pop and slide only animate inward; a retiring target fades out
+		-- without also shrinking or pulling its chips away.
+		if config.Pop ~= false then
+			anim.Pop = Anim.step(anim.Pop, 1, popDuration, delta)
+		else
+			anim.Pop = 1
+		end
+		if config.Slide ~= false then
+			anim.Slide = Anim.step(anim.Slide, 1, slideDuration, delta)
+		else
+			anim.Slide = 1
+		end
+		if config.Sweep ~= false then
+			anim.Sweep = Anim.step(anim.Sweep, 1, sweepDuration, delta)
+		else
+			anim.Sweep = 1
+		end
+		-- The tracer and arrow only animate inward. A retiring entry fades
+		-- out with its other elements instead of un-drawing the line.
+		if config.Tracer ~= false then
+			anim.Tracer = Anim.step(anim.Tracer, 1, tracerDuration, delta)
+		else
+			anim.Tracer = 1
+		end
+		if config.Arrow ~= false then
+			anim.Arrow = Anim.step(anim.Arrow, 1, arrowDuration, delta)
+		else
+			anim.Arrow = 1
+		end
 	else
-		anim.Alpha = target
-		anim.Slide = 1
-		anim.Scale = 1
+		anim.Fade = target
+		anim.Pop = target
+		anim.Slide = target
+		anim.Sweep = 1
 		anim.Tracer = 1
 		anim.Arrow = 1
-		anim.SlideOffset = 0
 	end
 
+	-- Display values, derived once per frame.
+	local popAmount = on and config.Pop ~= false and (config.PopAmount or 0.14) or 0
+	local slideDistance = on and config.Slide ~= false and (config.SlideDistance or 14) or 0
+
+	anim.Scale = 1 - popAmount * (1 - Anim.back(anim.Pop, 1.4))
+	anim.SlideOffset = (1 - Anim.cubic(anim.Slide)) * slideDistance
+	anim.SweepEased = Anim.cubic(anim.Sweep)
+	anim.TracerEased = Anim.cubic(anim.Tracer)
+	anim.ArrowEased = Anim.cubic(anim.Arrow)
+
 	local base = self.State.BaseAlpha or 1
-	self.State.Alpha = base * anim.Alpha
+	self.State.Alpha = base * Anim.cubic(anim.Fade)
 
 	-- Only a retiring entry can finish. A fading-in entry is always kept.
-	return not self.Retiring or anim.Alpha > 0.01
+	return not self.Retiring or anim.Fade > 0.01
 end
 
 function Entry:Draw(state)

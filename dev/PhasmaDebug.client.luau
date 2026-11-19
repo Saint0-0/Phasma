@@ -694,20 +694,57 @@ toggleRow(stylePage, nextOrder(stylePage), "Joint dots", function()
 end, function(value)
 	esp.Settings.Skeleton.Joints = value
 end)
+sectionLabel(stylePage, nextOrder(stylePage), "ANIMATIONS")
 toggleRow(stylePage, nextOrder(stylePage), "Animations", function()
 	return esp.Settings.Animations.Enabled
 end, function(value)
 	esp.Settings.Animations.Enabled = value
 end)
-toggleRow(stylePage, nextOrder(stylePage), "Tracer anim", function()
+sectionLabel(stylePage, nextOrder(stylePage), "SPEED")
+segmentedRow(stylePage, nextOrder(stylePage), { 0.5, 1, 1.5, 2 }, function()
+	return esp.Settings.Animations.Speed
+end, function(value)
+	esp.Settings.Animations.Speed = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Fade", function()
+	return esp.Settings.Animations.Fade
+end, function(value)
+	esp.Settings.Animations.Fade = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Box pop", function()
+	return esp.Settings.Animations.Pop
+end, function(value)
+	esp.Settings.Animations.Pop = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Chip slide", function()
+	return esp.Settings.Animations.Slide
+end, function(value)
+	esp.Settings.Animations.Slide = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Corner sweep", function()
+	return esp.Settings.Animations.Sweep
+end, function(value)
+	esp.Settings.Animations.Sweep = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Tracer draw", function()
 	return esp.Settings.Animations.Tracer
 end, function(value)
 	esp.Settings.Animations.Tracer = value
 end)
-toggleRow(stylePage, nextOrder(stylePage), "Arrow anim", function()
+toggleRow(stylePage, nextOrder(stylePage), "Arrow slide", function()
 	return esp.Settings.Animations.Arrow
 end, function(value)
 	esp.Settings.Animations.Arrow = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Tracer glow", function()
+	return esp.Settings.Tracer.Glow
+end, function(value)
+	esp.Settings.Tracer.Glow = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Tracer spark", function()
+	return esp.Settings.Tracer.Spark
+end, function(value)
+	esp.Settings.Tracer.Spark = value
 end)
 toggleRow(stylePage, nextOrder(stylePage), "Horizontal health", function()
 	return esp.Settings.Health.Style == "Horizontal"

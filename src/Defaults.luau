@@ -33,18 +33,33 @@ local Defaults = {
 	FadeWithDistance = true,
 	FadeFloor = 0.72,
 
-	-- Target-level transitions. Exponential convergence rather than
-	-- TweenService: Drawing objects are not Instances.
+	-- Target-level transitions. Time-based scalar tracks rather than
+	-- TweenService: Drawing objects are not Instances. Every channel has its
+	-- own switch, so any one of them can be left instant while the rest move.
 	Animations = {
 		Enabled = true,
-		-- Higher converges faster; 0 snaps.
-		Speed = 12,
-		-- Pixels the name and distance slide while fading in.
-		Slide = 8,
-		-- Fraction the box shrinks by at the start of a fade-in.
-		Pop = 0.06,
+		-- Duration multiplier: 2 is twice as fast, 0.5 is half speed, 0 snaps.
+		Speed = 1,
+		-- Fade the whole target in and out.
+		Fade = true,
+		FadeDuration = 0.25,
+		-- Settle the box from slightly smaller with a soft overshoot.
+		Pop = true,
+		PopAmount = 0.14,
+		PopDuration = 0.34,
+		-- Slide the name and distance chips out from the box edge.
+		Slide = true,
+		SlideDistance = 14,
+		SlideDuration = 0.3,
+		-- Draw the corner brackets outward from their corners.
+		Sweep = true,
+		SweepDuration = 0.36,
+		-- Grow the tracer from its origin to the target.
 		Tracer = true,
+		TracerDuration = 0.5,
+		-- Slide the edge arrow in from outside the viewport.
 		Arrow = true,
+		ArrowDuration = 0.32,
 	},
 
 	-- Optional target whitelist/blacklist and per-frame cap.
@@ -172,6 +187,14 @@ local Defaults = {
 		Transparency = 0.35,
 		-- Bottom, Top, Left, Right, Center or Mouse.
 		From = "Bottom",
+		-- A wide, faint line behind the tracer reads as light rather than a
+		-- second line. The spark rides the tip while the tracer draws in.
+		Glow = true,
+		GlowThickness = 4,
+		-- Added to the core transparency, so the glow stays fainter than the
+		-- line it sits behind.
+		GlowTransparency = 0.35,
+		Spark = true,
 	},
 
 	Skeleton = {

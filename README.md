@@ -6,7 +6,7 @@ The library is modular: each element is its own module, the rendering backend is
 
 ## Status
 
-`v0.5.0` is the motion and scale pass: target fade/pop/slide transitions, tracer draw-on and arrow slide, filters with `MaxTargets` and priority, distance-based LOD throttling, facing chevrons, horizontal and secondary health bars, tagged object ESP, Highlight chams presets and named presets. The roadmap lives in `plan.md`.
+`v0.6.0` is the animation pass: time-based target fades, an overshooting box pop, sliding name and distance chips, a corner sweep, a tracer that draws out of its origin with a glow and a travelling spark, and an edge arrow that slides and grows in. Every channel has its own switch and shares one speed multiplier. Filters, distance LOD, facing chevrons, horizontal and secondary health bars, tagged object ESP, Highlight chams presets and named presets are unchanged. The roadmap lives in `plan.md`.
 
 ## Load it
 
@@ -93,11 +93,21 @@ Animations:
 | Key | Default | Description |
 | --- | --- | --- |
 | `Animations.Enabled` | `true` | Master switch for target transitions. Element toggles stay instant either way. |
-| `Animations.Speed` | `12` | Convergence rate; higher settles faster, `0` snaps. |
-| `Animations.Slide` | `8` | Pixels the name and distance slide while fading in. |
-| `Animations.Pop` | `0.06` | Fraction the box shrinks by at the start of a fade-in. |
+| `Animations.Speed` | `1` | Duration multiplier: `2` is twice as fast, `0.5` is half speed, `0` snaps. |
+| `Animations.Fade` | `true` | Fades the whole target in and out. |
+| `Animations.FadeDuration` | `0.25` | Seconds for one fade direction at `Speed = 1`. |
+| `Animations.Pop` | `true` | Settles the box from slightly smaller with a soft overshoot. |
+| `Animations.PopAmount` | `0.14` | Fraction the box starts below full size. |
+| `Animations.PopDuration` | `0.34` | Seconds for the pop to settle. |
+| `Animations.Slide` | `true` | Slides the name, distance and facing marker out from the box. |
+| `Animations.SlideDistance` | `14` | Pixels travelled at the start of the slide. |
+| `Animations.SlideDuration` | `0.3` | Seconds for the slide to settle. |
+| `Animations.Sweep` | `true` | Draws the corner brackets outward from their corners. |
+| `Animations.SweepDuration` | `0.36` | Seconds for all four corners to finish. |
 | `Animations.Tracer` | `true` | Grows the tracer from its origin to the target. |
-| `Animations.Arrow` | `true` | Slides edge arrows in from outside the viewport. |
+| `Animations.TracerDuration` | `0.5` | Seconds for the tracer to reach the target. |
+| `Animations.Arrow` | `true` | Slides and grows edge arrows in from outside the viewport. |
+| `Animations.ArrowDuration` | `0.32` | Seconds for the arrow to land. |
 
 Filters and level of detail:
 
@@ -137,7 +147,7 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 | `Name` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `UseDisplayName`, `Offset`, `Background`, `BackgroundColor`, `BackgroundTransparency`, `Padding` |
 | `Distance` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `Offset`, `Suffix`, `Scale`, `Background`, `BackgroundColor`, `BackgroundTransparency`, `Padding` |
 | `Health` | `Enabled`, `Width`, `Gap`, `Transparency`, `Background`, `BackgroundTransparency`, `ShowText`, `Percent`, `TextSize`, `Style` (`"Vertical"`, `"Horizontal"`), `TextSide` (`"Left"`, `"Right"`, `"Above"`, `"Below"`), `Smoothing`, `Rounded`, `Pulse`, `Secondary` (`Enabled`, `Attribute`, `MaxAttribute`, `Color`, `Transparency`) |
-| `Tracer` | `Enabled`, `Color`, `Thickness`, `Transparency`, `From` (`"Bottom"`, `"Top"`, `"Left"`, `"Right"`, `"Center"`, `"Mouse"`) |
+| `Tracer` | `Enabled`, `Color`, `Thickness`, `Transparency`, `From` (`"Bottom"`, `"Top"`, `"Left"`, `"Right"`, `"Center"`, `"Mouse"`), `Glow`, `GlowThickness`, `GlowTransparency`, `Spark` |
 | `Skeleton` | `Enabled`, `Color`, `Thickness`, `Transparency`, `Joints`, `JointRadius` |
 | `HeadDot` | `Enabled`, `Color`, `Radius`, `Filled`, `Transparency` |
 | `Highlight` | `Enabled`, `Preset` (`"Custom"`, `"Solid"`, `"Outline"`, `"Glow"`, `"Soft"`), `UseTeamColor`, `MaxInstances`, `Fill`, `Outline`, `FillTransparency`, `OutlineTransparency`, `DepthMode` (`"AlwaysOnTop"`, `"Occluded"`) |
@@ -162,11 +172,13 @@ When `TeamColor` is on and a player has a `Team`, the team colour replaces the c
 
 `Direction` draws a small two-line chevron above the box from the screen-projected head look vector. A target facing straight at the camera has almost no screen-space direction, so the chevron hides instead of flickering.
 
-`Tracer.From` accepts `"Bottom"`, `"Top"`, `"Left"`, `"Right"`, `"Center"` and `"Mouse"`. `"Mouse"` follows the pointer.
+`Tracer.From` accepts `"Bottom"`, `"Top"`, `"Left"`, `"Right"`, `"Center"` and `"Mouse"`. `"Mouse"` follows the pointer. `Tracer.Glow` draws a wider, fainter line behind the tracer; `GlowTransparency` is added to the core transparency so the glow always stays softer than the line. `Tracer.Spark` rides the tip while the tracer is drawing and fades out once it reaches the target. The draw replays when a target comes back into view after being off screen for at least 0.2 seconds, so a box wobbling on the edge does not restart it every frame.
 
 `Highlight.Preset` replaces the four colour/transparency keys with `"Solid"`, `"Outline"`, `"Glow"` or `"Soft"`; `"Custom"` keeps them. `UseTeamColor` paints the fill and outline from the target's team, and `MaxInstances` (default `31`) stops the engine's Highlight ceiling from being exceeded.
 
-With `Animations.Enabled` on, new targets fade in, the box settles from `Animations.Pop`, name and distance slide from the box edge, the tracer draws from its origin, and edge arrows slide in. Removed, dead or out-of-range targets fade out before their elements are destroyed. Element `Enabled` toggles are not animated, so the panel stays responsive.
+With `Animations.Enabled` on, new targets fade in, the box pops in with a soft overshoot, the corner brackets sweep outward, name and distance slide from the box edge, the tracer draws from its origin with a glow and a spark on the tip, and edge arrows slide and grow in. Removed, dead or out-of-range targets fade out before their elements are destroyed. The tracer and arrow only animate inward; a retiring target fades out with its other elements instead of un-drawing the line.
+
+Each channel is switchable on its own (`Fade`, `Pop`, `Slide`, `Sweep`, `Tracer`, `Arrow`), and `Speed` scales every duration at once. Element `Enabled` toggles are not animated, so the panel stays responsive.
 
 `Filters` is off by default. Enabling it allows a whitelist, blacklist and case-insensitive name substring, then sorts by `Priority` and keeps the first `MaxTargets`. A cap hides the extras rather than retiring them, so a target can return immediately when the ranking changes.
 
@@ -214,7 +226,7 @@ The render path is built to stay flat as the target count grows:
 
 - Each `Entry` owns one reusable state table. Box, bones and joint points are written in place, so a frame allocates no per-target tables.
 - Candidate records are pooled and reused. Sorting and `MaxTargets` only run while `Filters.Enabled` is on.
-- Animations are an exponential approach in `Utils/Anim`, not `TweenService`: Drawing objects are not Instances, and there are no tween objects to allocate.
+- Animations are time-based scalar tracks in `Utils/Anim`, not `TweenService`: Drawing objects are not Instances, and there are no tween objects to allocate. Each channel is a single number stepped once per frame; easing is applied to the display value only.
 - Beyond `LOD.DetailDistance`, a target rebuilds only every `LOD.UpdateInterval` seconds. The animation step and element draw still run at full frame rate.
 - Canvas proxies compare the new value with the old one and skip the write. Constant properties like colour and thickness cost nothing after the first frame.
 - The bounding box projects only the rig's body parts, and falls back to a scaled root-centred box at the near plane.
@@ -235,7 +247,7 @@ The render path is built to stay flat as the target count grows:
 - Four tagged loot models (`PhasmaLoot`: Chest, Ammo, Medkit, Relic) so object ESP has something to box.
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
 - A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players. It is one window with a left tab rail (`ESP`, `STYLE`, `ELEMENTS`, `COLOURS`) and a scrolling page per tab, so the panel stays a fixed size.
-- The `ESP` tab also carries the preset buttons, filters (`MaxTargets`, priority), LOD detail distance and object ESP controls. The `STYLE` tab carries animation toggles, tracer origin and the horizontal-health switch.
+- The `ESP` tab also carries the preset buttons, filters (`MaxTargets`, priority), LOD detail distance and object ESP controls. The `STYLE` tab carries the animation master switch, a speed row, per-channel toggles (fade, pop, slide, sweep, tracer, arrow), tracer glow/spark, tracer origin and the horizontal-health switch.
 - The `COLOURS` tab: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline, the health bar background, the direction chevron and the arrow are included.
 
 Controls: **RightAlt** hides or shows the window, the title bar drags it, and the tab bar switches pages. Every row toggles the matching setting on the next frame. The footer shows the active backend, the target count and the live engine count.
@@ -268,7 +280,7 @@ tools\selene.exe example
 tools\selene.exe dev
 
 # bundle dist/Phasma.luau + dist/Phasma.rbxm
-tools\lune.exe run build\init.luau 0.5.0
+tools\lune.exe run build\init.luau 0.6.0
 
 # live loop: rebuild the bundle on save, and serve the place
 tools\darklua.exe process src/Init.luau dist/Phasma.luau -c build/darklua.json -w
@@ -310,7 +322,7 @@ src/
     Color.luau            health gradient
     Alpha.luau            distance fade helper
     Occlusion.luau        shared occluded colour and transparency
-    Anim.luau             exponential easing for transitions
+    Anim.luau             time-based tracks and easing curves
     Random.luau           random instance tags for security
 example/Phasma_Test.client.luau
 dev/DummySpawner.server.luau

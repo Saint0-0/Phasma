@@ -9,10 +9,21 @@
 ]]
 
 local Alpha = require("../Utils/Alpha")
+local Anim = require("../Utils/Anim")
 local Occlusion = require("../Utils/Occlusion")
 
 local Box = {}
 Box.__index = Box
+
+-- Bracket length while the corners sweep in. Each corner starts a little
+-- after the previous one, so the box assembles rather than snapping.
+local function swept(base, progress, corner)
+	if progress >= 1 then
+		return base
+	end
+	local start = (corner - 1) * 0.08
+	return base * Anim.cubic((progress - start) / 0.72)
+end
 
 function Box.New(ctx)
 	local self = setmetatable({}, Box)
@@ -114,19 +125,25 @@ function Box:Update(state)
 		local right = x + width
 		local bottom = y + height
 		local lines = self.Corners
+		local sweep = state.Anim and state.Anim.SweepEased or 1
+
+		local tl = swept(length, sweep, 1)
+		local tr = swept(length, sweep, 2)
+		local bl = swept(length, sweep, 3)
+		local br = swept(length, sweep, 4)
 
 		-- Top-left.
-		segment(lines[1], x, y, x + length, y, color, thickness, transparency)
-		segment(lines[2], x, y, x, y + length, color, thickness, transparency)
+		segment(lines[1], x, y, x + tl, y, color, thickness, transparency)
+		segment(lines[2], x, y, x, y + tl, color, thickness, transparency)
 		-- Top-right.
-		segment(lines[3], right - length, y, right, y, color, thickness, transparency)
-		segment(lines[4], right, y, right, y + length, color, thickness, transparency)
+		segment(lines[3], right - tr, y, right, y, color, thickness, transparency)
+		segment(lines[4], right, y, right, y + tr, color, thickness, transparency)
 		-- Bottom-left.
-		segment(lines[5], x, bottom - length, x, bottom, color, thickness, transparency)
-		segment(lines[6], x, bottom, x + length, bottom, color, thickness, transparency)
+		segment(lines[5], x, bottom - bl, x, bottom, color, thickness, transparency)
+		segment(lines[6], x, bottom, x + bl, bottom, color, thickness, transparency)
 		-- Bottom-right.
-		segment(lines[7], right, bottom - length, right, bottom, color, thickness, transparency)
-		segment(lines[8], right - length, bottom, right, bottom, color, thickness, transparency)
+		segment(lines[7], right, bottom - br, right, bottom, color, thickness, transparency)
+		segment(lines[8], right - br, bottom, right, bottom, color, thickness, transparency)
 	else
 		for _, line in ipairs(self.Corners) do
 			line.Visible = false
