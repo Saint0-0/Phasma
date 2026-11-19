@@ -95,6 +95,8 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 
 Both expose the same object surface (`Line`, `Rect`, `Text`, `Circle`), so element modules never branch on the backend.
 
+Projection goes through `Camera:WorldToViewportPoint`, the inset-free space. That is the same space the Drawing API draws in and the same space a ScreenGui gets with `IgnoreGuiInset`, so both backends land on the same pixels. `WorldToScreenPoint` would push everything down by the top bar.
+
 ## The test place
 
 `Phasma.rbxl` opens with:
@@ -156,7 +158,7 @@ src/
     Box.luau  Name.luau  Distance.luau  Health.luau
     Tracer.luau  Skeleton.luau  HeadDot.luau  Highlight.luau
   Utils/
-    Math.luau  Color.luau
+    Color.luau
 example/Phasma_Test.client.luau
 dev/DummySpawner.server.luau
 dev/PhasmaDebug.client.luau

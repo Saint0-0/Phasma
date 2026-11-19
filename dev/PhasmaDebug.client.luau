@@ -185,16 +185,19 @@ local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "PhasmaDebug"
-gui.IgnoreGuiInset = true
+-- Keep the panel below the top bar; it is UI, not part of the overlay.
+gui.IgnoreGuiInset = false
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 1000000
+gui.Enabled = true
 gui.Parent = playerGui
 
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.Position = UDim2.fromOffset(24, 24)
-panel.Size = UDim2.fromOffset(248, 0)
-panel.AutomaticSize = Enum.AutomaticSize.Y
+panel.Position = UDim2.fromOffset(16, 16)
+-- Fixed height: AutomaticSize on a frame with a list layout can resolve to 0
+-- for a frame, which makes the whole panel invisible.
+panel.Size = UDim2.fromOffset(248, 450)
 panel.BackgroundColor3 = COLORS.Panel
 panel.BorderSizePixel = 0
 panel.Parent = gui
@@ -297,6 +300,19 @@ status.TextColor3 = COLORS.Muted
 status.TextXAlignment = Enum.TextXAlignment.Left
 status.Text = "starting"
 status.Parent = panel
+
+-- One-time check: a panel with a real size is proof the overlay is on screen.
+task.delay(0.2, function()
+	print(
+		string.format(
+			"[Phasma] panel %.0fx%.0f at (%.0f, %.0f)",
+			panel.AbsoluteSize.X,
+			panel.AbsoluteSize.Y,
+			panel.AbsolutePosition.X,
+			panel.AbsolutePosition.Y
+		)
+	)
+end)
 
 -- The entry map is internal; a dev panel may read it for a live count.
 local elapsed = 0

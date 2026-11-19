@@ -14,16 +14,15 @@ function Camera.get()
 end
 
 -- Returns nil when the point sits behind the camera, where projection flips.
+-- WorldToViewportPoint is the inset-free space: (0,0) is the top-left of the
+-- viewport, which matches a ScreenGui with IgnoreGuiInset and the Drawing API.
+-- WorldToScreenPoint would shift everything down by the top bar.
 function Camera.project(camera, world)
-	local point, onScreen = camera:WorldToScreenPoint(world)
+	local point, onScreen = camera:WorldToViewportPoint(world)
 	if point.Z <= 0 then
 		return nil, false
 	end
 	return Vector2.new(point.X, point.Y), onScreen
-end
-
-function Camera.viewport(camera)
-	return camera.ViewportSize
 end
 
 return Camera
