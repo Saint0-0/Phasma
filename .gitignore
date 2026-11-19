@@ -29,6 +29,10 @@ Thumbs.db
 # Local working plan (review copy, not committed)
 /plan.md
 
+# Private test harness (local only, never distributed)
+/archive/
+/dev.project.json
+
 # Lint / format scratch output
 /lint-*.txt
 /selene-quiet*.txt

@@ -37,15 +37,11 @@
         "Init": { "$path": "dist/Phasma.luau" }
       }
     },
-    "ServerScriptService": {
-      "$className": "ServerScriptService",
-      "DummySpawner": { "$path": "dev/DummySpawner.server.luau" }
-    },
     "StarterPlayer": {
       "$className": "StarterPlayer",
       "StarterPlayerScripts": {
         "$className": "StarterPlayerScripts",
-        "PhasmaDebug": { "$path": "dev/PhasmaDebug.client.luau" }
+        "PhasmaTest": { "$path": "example/Phasma_Test.client.luau" }
       }
     }
   }

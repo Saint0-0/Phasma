@@ -1,7 +1,8 @@
 --[[
 	Phasma/example/Phasma_Test.client.luau
 
-	Showcase config for the test place.
+	Showcase configuration. Copy this file and adjust the settings for your
+	own place. The library is required from ReplicatedStorage.Phasma.Init.
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
@@ -14,7 +15,7 @@ local esp = Phasma:CreateESP({
 	MaxDistance = 1200,
 	TeamCheck = false,
 	VisibilityCheck = false,
-	IncludeNPCs = true, -- the test dummies are humanoid models, not players
+	IncludeNPCs = true, -- also draw humanoid models that are not player characters
 
 	-- Target transitions: fade, box pop, chip slide, corner sweep, tracer
 	-- draw-on and arrow slide. Every channel has its own switch; element
@@ -40,11 +41,11 @@ local esp = Phasma:CreateESP({
 		UpdateInterval = 0.05,
 	},
 
-	-- The test range tags a few loot models with "PhasmaLoot".
+	-- Tagged models are boxed in Objects.Color.
 	Objects = {
 		Enabled = true,
 		MaxDistance = 800,
-		Tags = { "PhasmaLoot" },
+		Tags = { "Loot", "Chest" },
 		Classes = { "Model" },
 		Color = Color3.fromRGB(255, 206, 132),
 		-- Off-screen objects keep the edge arrow by default.
