@@ -234,7 +234,7 @@ The render path is built to stay flat as the target count grows:
 - Eight R15 dummies at 10, 25, 50, 100, 200, 350 and 500 studs, plus one behind spawn, each with a different health value.
 - Four tagged loot models (`PhasmaLoot`: Chest, Ammo, Medkit, Relic) so object ESP has something to box.
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
-- A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players. It is one window with `ESP`, `STYLE`, `ELEMENTS` and `COLOURS` tabs; each tab scrolls independently, so the panel stays a fixed size.
+- A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players. It is one window with a left tab rail (`ESP`, `STYLE`, `ELEMENTS`, `COLOURS`) and a scrolling page per tab, so the panel stays a fixed size.
 - The `ESP` tab also carries the preset buttons, filters (`MaxTargets`, priority), LOD detail distance and object ESP controls. The `STYLE` tab carries animation toggles, tracer origin and the horizontal-health switch.
 - The `COLOURS` tab: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline, the health bar background, the direction chevron and the arrow are included.
 

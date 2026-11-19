@@ -1,9 +1,9 @@
 --[[
 	Phasma/dev/PhasmaDebug.client.luau
 
-	Dev-only control panel for the test place. One draggable window with a tab
-	bar and a scrolling page per group: ESP, STYLE, ELEMENTS and COLOURS. It
-	owns the single ESP instance for the place.
+	Dev-only control panel for the test place. One draggable window with a
+	left tab rail and a scrolling page per group: ESP, STYLE, ELEMENTS and
+	COLOURS. It owns the single ESP instance for the place.
 
 	Nothing under src/ requires this file, so it never reaches dist/Phasma.luau
 	or dist/Phasma.rbxm. It exists only inside the test place.
@@ -64,7 +64,7 @@ local function toggleRow(parent, order, label, get, set)
 	row.AutoButtonColor = false
 	row.Text = ""
 	row.Parent = parent
-	rounded(row, 4)
+	rounded(row, 2)
 
 	local text = Instance.new("TextLabel")
 	text.BackgroundTransparency = 1
@@ -84,14 +84,14 @@ local function toggleRow(parent, order, label, get, set)
 	pill.Size = UDim2.fromOffset(28, 14)
 	pill.BorderSizePixel = 0
 	pill.Parent = row
-	rounded(pill, 7)
+	rounded(pill, 2)
 
 	local knob = Instance.new("Frame")
 	knob.AnchorPoint = Vector2.new(0, 0.5)
 	knob.Size = UDim2.fromOffset(10, 10)
 	knob.BorderSizePixel = 0
 	knob.Parent = pill
-	rounded(knob, 5)
+	rounded(knob, 1)
 
 	local function refresh()
 		local on = get() == true
@@ -162,7 +162,7 @@ local function segmentedRow(parent, order, values, get, set)
 		button.TextColor3 = COLORS.Text
 		button.Text = tostring(value)
 		button.Parent = holder
-		rounded(button, 4)
+		rounded(button, 2)
 
 		button.MouseButton1Click:Connect(function()
 			set(value)
@@ -214,7 +214,7 @@ local function distanceRow(parent, order)
 		button.TextColor3 = COLORS.Text
 		button.Text = tostring(value)
 		button.Parent = holder
-		rounded(button, 4)
+		rounded(button, 2)
 
 		button.MouseButton1Click:Connect(function()
 			esp:SetMaxDistance(value)
@@ -264,36 +264,29 @@ gui.Parent = playerGui
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.Position = UDim2.fromOffset(16, 16)
-panel.Size = UDim2.fromOffset(300, 520)
+panel.Size = UDim2.fromOffset(460, 560)
 panel.BackgroundColor3 = COLORS.Panel
 panel.BorderSizePixel = 0
 panel.Active = true
 panel.Visible = true
 panel.Parent = gui
-rounded(panel, 8)
 
 local stroke = Instance.new("UIStroke")
 stroke.Color = COLORS.Stroke
 stroke.Thickness = 1
 stroke.Parent = panel
 
-local padding = Instance.new("UIPadding")
-padding.PaddingTop = UDim.new(0, 8)
-padding.PaddingBottom = UDim.new(0, 8)
-padding.PaddingLeft = UDim.new(0, 8)
-padding.PaddingRight = UDim.new(0, 8)
-padding.Parent = panel
-
 local title = Instance.new("Frame")
 title.Name = "Title"
 title.BackgroundTransparency = 1
 title.Active = true
-title.Size = UDim2.new(1, 0, 0, 24)
+title.Size = UDim2.new(1, 0, 0, 30)
 title.Parent = panel
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.BackgroundTransparency = 1
-titleLabel.Size = UDim2.new(1, -60, 1, 0)
+titleLabel.Position = UDim2.fromOffset(10, 0)
+titleLabel.Size = UDim2.new(1, -70, 1, 0)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 12
 titleLabel.TextColor3 = COLORS.Text
@@ -303,7 +296,7 @@ titleLabel.Parent = title
 
 local hint = Instance.new("TextLabel")
 hint.AnchorPoint = Vector2.new(1, 0.5)
-hint.Position = UDim2.fromScale(1, 0.5)
+hint.Position = UDim2.new(1, -10, 0.5, 0)
 hint.Size = UDim2.fromOffset(44, 24)
 hint.BackgroundTransparency = 1
 hint.Font = Enum.Font.GothamMedium
@@ -313,33 +306,84 @@ hint.TextXAlignment = Enum.TextXAlignment.Right
 hint.Text = "RAlt"
 hint.Parent = title
 
+local titleDivider = Instance.new("Frame")
+titleDivider.Name = "TitleDivider"
+titleDivider.Position = UDim2.fromOffset(0, 30)
+titleDivider.Size = UDim2.new(1, 0, 0, 1)
+titleDivider.BackgroundColor3 = COLORS.Stroke
+titleDivider.BackgroundTransparency = 0.35
+titleDivider.BorderSizePixel = 0
+titleDivider.Parent = panel
+
+local body = Instance.new("Frame")
+body.Name = "Body"
+body.Position = UDim2.fromOffset(0, 31)
+body.Size = UDim2.new(1, 0, 1, -49)
+body.BackgroundTransparency = 1
+body.Parent = panel
+
+-- Left rail, in the spirit of the Aetheris sidebar: vertical tabs with a
+-- 2px accent marker on the active row.
 local tabBar = Instance.new("Frame")
 tabBar.Name = "Tabs"
-tabBar.Position = UDim2.fromOffset(0, 30)
-tabBar.Size = UDim2.new(1, 0, 0, 26)
-tabBar.BackgroundTransparency = 1
-tabBar.Parent = panel
+tabBar.Size = UDim2.new(0, 112, 1, 0)
+tabBar.BackgroundColor3 = Color3.fromRGB(22, 24, 30)
+tabBar.BorderSizePixel = 0
+tabBar.Parent = body
+
+local tabPadding = Instance.new("UIPadding")
+tabPadding.PaddingTop = UDim.new(0, 6)
+tabPadding.PaddingBottom = UDim.new(0, 6)
+tabPadding.PaddingLeft = UDim.new(0, 6)
+tabPadding.PaddingRight = UDim.new(0, 6)
+tabPadding.Parent = tabBar
 
 local tabLayout = Instance.new("UIListLayout")
-tabLayout.FillDirection = Enum.FillDirection.Horizontal
-tabLayout.Padding = UDim.new(0, 4)
+tabLayout.FillDirection = Enum.FillDirection.Vertical
+tabLayout.Padding = UDim.new(0, 2)
 tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
 tabLayout.Parent = tabBar
+
+local railDivider = Instance.new("Frame")
+railDivider.Name = "RailDivider"
+railDivider.Position = UDim2.fromOffset(112, 0)
+railDivider.Size = UDim2.new(0, 1, 1, 0)
+railDivider.BackgroundColor3 = COLORS.Stroke
+railDivider.BackgroundTransparency = 0.4
+railDivider.BorderSizePixel = 0
+railDivider.Parent = body
 
 -- Pages are clipped to this frame; each page is a ScrollingFrame of its own.
 local content = Instance.new("Frame")
 content.Name = "Content"
-content.Position = UDim2.fromOffset(0, 62)
-content.Size = UDim2.new(1, 0, 1, -82)
+content.Position = UDim2.fromOffset(113, 0)
+content.Size = UDim2.new(1, -113, 1, 0)
 content.BackgroundTransparency = 1
 content.ClipsDescendants = true
-content.Parent = panel
+content.Parent = body
+
+local contentPadding = Instance.new("UIPadding")
+contentPadding.PaddingTop = UDim.new(0, 8)
+contentPadding.PaddingBottom = UDim.new(0, 8)
+contentPadding.PaddingLeft = UDim.new(0, 8)
+contentPadding.PaddingRight = UDim.new(0, 8)
+contentPadding.Parent = content
+
+local statusDivider = Instance.new("Frame")
+statusDivider.Name = "StatusDivider"
+statusDivider.AnchorPoint = Vector2.new(0, 1)
+statusDivider.Position = UDim2.new(0, 0, 1, -18)
+statusDivider.Size = UDim2.new(1, 0, 0, 1)
+statusDivider.BackgroundColor3 = COLORS.Stroke
+statusDivider.BackgroundTransparency = 0.35
+statusDivider.BorderSizePixel = 0
+statusDivider.Parent = panel
 
 local status = Instance.new("TextLabel")
 status.Name = "Status"
 status.AnchorPoint = Vector2.new(0, 1)
 status.Position = UDim2.fromScale(0, 1)
-status.Size = UDim2.new(1, 0, 0, 16)
+status.Size = UDim2.new(1, -20, 0, 18)
 status.BackgroundTransparency = 1
 status.Font = Enum.Font.GothamMedium
 status.TextSize = 10
@@ -348,7 +392,12 @@ status.TextXAlignment = Enum.TextXAlignment.Left
 status.Text = "loading library"
 status.Parent = panel
 
+local statusPadding = Instance.new("UIPadding")
+statusPadding.PaddingLeft = UDim.new(0, 10)
+statusPadding.Parent = status
+
 local tabButtons = {}
+local tabMarkers = {}
 local pages = {}
 local orders = {}
 
@@ -358,8 +407,9 @@ local function selectTab(name)
 	end
 	for key, button in pairs(tabButtons) do
 		local on = key == name
-		button.BackgroundColor3 = on and COLORS.Accent or COLORS.Row
-		button.TextColor3 = on and COLORS.KnobOn or COLORS.Text
+		button.BackgroundTransparency = on and 0 or 1
+		button.TextColor3 = on and COLORS.Accent or COLORS.Text
+		tabMarkers[key].Visible = on
 	end
 end
 
@@ -367,20 +417,35 @@ for index, name in ipairs(TABS) do
 	local button = Instance.new("TextButton")
 	button.Name = name
 	button.LayoutOrder = index
-	button.Size = UDim2.new(0.25, -3, 1, 0)
+	button.Size = UDim2.new(1, 0, 0, 28)
 	button.BackgroundColor3 = COLORS.Row
+	button.BackgroundTransparency = 1
 	button.BorderSizePixel = 0
 	button.AutoButtonColor = false
 	button.Font = Enum.Font.GothamMedium
-	button.TextSize = 10
+	button.TextSize = 11
 	button.TextColor3 = COLORS.Text
+	button.TextXAlignment = Enum.TextXAlignment.Left
 	button.Text = name
 	button.Parent = tabBar
-	rounded(button, 4)
+
+	local buttonPadding = Instance.new("UIPadding")
+	buttonPadding.PaddingLeft = UDim.new(0, 12)
+	buttonPadding.Parent = button
+
+	local marker = Instance.new("Frame")
+	marker.Name = "Marker"
+	marker.Size = UDim2.new(0, 2, 1, 0)
+	marker.BackgroundColor3 = COLORS.Accent
+	marker.BorderSizePixel = 0
+	marker.Visible = false
+	marker.Parent = button
+
 	button.MouseButton1Click:Connect(function()
 		selectTab(name)
 	end)
 	tabButtons[name] = button
+	tabMarkers[name] = marker
 end
 
 local function nextOrder(page)
@@ -490,7 +555,7 @@ local function presetRow(parent, order)
 		button.TextColor3 = COLORS.Text
 		button.Text = name
 		button.Parent = holder
-		rounded(button, 4)
+		rounded(button, 2)
 
 		button.MouseButton1Click:Connect(function()
 			if esp:ApplyPreset(name) then
@@ -716,7 +781,7 @@ preview.Size = UDim2.new(1, 0, 0, 30)
 preview.BackgroundColor3 = Color3.new(1, 1, 1)
 preview.BorderSizePixel = 0
 preview.Parent = colourPage
-rounded(preview, 6)
+rounded(preview, 2)
 
 local previewStroke = Instance.new("UIStroke")
 previewStroke.Color = COLORS.Stroke
@@ -794,7 +859,7 @@ for index, channel in ipairs(CHANNELS) do
 	rail.BackgroundColor3 = COLORS.Row
 	rail.BorderSizePixel = 0
 	rail.Parent = track
-	rounded(rail, 3)
+	rounded(rail, 1)
 
 	local fill = Instance.new("Frame")
 	fill.AnchorPoint = Vector2.new(0, 0.5)
@@ -803,7 +868,7 @@ for index, channel in ipairs(CHANNELS) do
 	fill.BackgroundColor3 = channelColor(index)
 	fill.BorderSizePixel = 0
 	fill.Parent = track
-	rounded(fill, 3)
+	rounded(fill, 1)
 
 	local knob = Instance.new("Frame")
 	knob.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -812,7 +877,7 @@ for index, channel in ipairs(CHANNELS) do
 	knob.BackgroundColor3 = COLORS.Text
 	knob.BorderSizePixel = 0
 	knob.Parent = track
-	rounded(knob, 5)
+	rounded(knob, 2)
 
 	local value = Instance.new("TextLabel")
 	value.AnchorPoint = Vector2.new(1, 0.5)
@@ -926,7 +991,7 @@ for index, spec in ipairs(COLOUR_TARGETS) do
 	chip.TextColor3 = COLORS.Text
 	chip.Text = spec.Name
 	chip.Parent = chipHolder
-	rounded(chip, 4)
+	rounded(chip, 2)
 	chip.MouseButton1Click:Connect(function()
 		selectChip(index)
 	end)
