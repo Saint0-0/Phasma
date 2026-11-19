@@ -3,6 +3,7 @@
 
 	ScreenGui backend used in Studio and on executors without Drawing. Same
 	proxy surface as DrawingCanvas, built from Frames, TextLabels and UIStrokes.
+
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
@@ -10,9 +11,11 @@
 local Players = game:GetService("Players")
 
 local Constants = require("../../Constants")
+local Random = require("../../Utils/Random")
 
 -- Executor globals live in the script environment; getfenv reaches them.
 local gethui = getfenv().gethui
+local protectgui = getfenv().protectgui
 
 local GuiCanvas = {}
 GuiCanvas.__index = GuiCanvas
@@ -29,6 +32,26 @@ local function resolveParent()
 		return player:FindFirstChildOfClass("PlayerGui") or player:WaitForChild("PlayerGui", 10)
 	end
 	return nil
+end
+
+-- protectgui is the common name; Synapse exposes syn.protect_gui instead.
+local function protect(gui)
+	if type(protectgui) == "function" then
+		local ok = pcall(protectgui, gui)
+		if ok then
+			return true
+		end
+	end
+
+	local syn = getfenv().syn
+	if type(syn) == "table" and type(syn.protect_gui) == "function" then
+		local ok = pcall(syn.protect_gui, gui)
+		if ok then
+			return true
+		end
+	end
+
+	return false
 end
 
 local function updateLine(object)
@@ -107,8 +130,8 @@ local function apply(object, key)
 	elseif key == "Centered" then
 		frame.TextXAlignment = props.Centered and Enum.TextXAlignment.Center or Enum.TextXAlignment.Left
 		frame.AnchorPoint = props.Centered and Vector2.new(0.5, 0.5) or Vector2.new(0, 0.5)
-	elseif key == "Outline" then
-		frame.TextStrokeTransparency = props.Outline and 0.3 or 1
+	elseif key == "Outline" or key == "OutlineTransparency" then
+		frame.TextStrokeTransparency = props.Outline and props.OutlineTransparency or 1
 	elseif key == "OutlineColor" then
 		frame.TextStrokeColor3 = props.OutlineColor
 	end
@@ -127,7 +150,13 @@ Object.__index = function(self, key)
 	return rawget(self, "_props")[key]
 end
 Object.__newindex = function(self, key, value)
-	rawset(rawget(self, "_props"), key, value)
+	local props = rawget(self, "_props")
+	-- Property writes are the expensive half of the Gui backend; skip the ones
+	-- that would not change anything.
+	if props[key] == value then
+		return
+	end
+	props[key] = value
 	apply(self, key)
 end
 
@@ -147,11 +176,20 @@ function Object:Destroy()
 	frame:Destroy()
 end
 
-function GuiCanvas.new()
+function GuiCanvas.new(security)
 	local self = setmetatable({ Kind = "Gui", _objects = {} }, GuiCanvas)
 
+	if type(security) ~= "table" then
+		security = { Enabled = false }
+	end
+
+	local active = security.Enabled ~= false
+	local randomize = active and security.RandomizeNames ~= false
+	local shouldProtect = active and security.ProtectGui ~= false
+	self._random = randomize
+
 	local gui = Instance.new("ScreenGui")
-	gui.Name = Constants.ScreenGuiName
+	gui.Name = randomize and Random.tag("ui") or Constants.ScreenGuiName
 	gui.IgnoreGuiInset = true
 	gui.ResetOnSpawn = false
 	gui.DisplayOrder = Constants.DisplayOrder
@@ -159,8 +197,19 @@ function GuiCanvas.new()
 	gui.Enabled = true
 	gui.Parent = resolveParent()
 
+	if shouldProtect and gui.Parent then
+		protect(gui)
+	end
+
 	self.Gui = gui
 	return self
+end
+
+function GuiCanvas:_name(base)
+	if self._random then
+		return Random.tag(base)
+	end
+	return base
 end
 
 function GuiCanvas:_object(kind, frame, stroke, props)
@@ -176,7 +225,7 @@ end
 
 function GuiCanvas:Line(zIndex)
 	local frame = Instance.new("Frame")
-	frame.Name = "PhasmaLine"
+	frame.Name = self:_name("Line")
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.BorderSizePixel = 0
 	frame.BackgroundColor3 = Color3.new(1, 1, 1)
@@ -197,7 +246,7 @@ end
 
 function GuiCanvas:Rect(zIndex)
 	local frame = Instance.new("Frame")
-	frame.Name = "PhasmaRect"
+	frame.Name = self:_name("Rect")
 	frame.BorderSizePixel = 0
 	frame.BackgroundTransparency = 1
 	frame.ZIndex = zIndex
@@ -226,7 +275,7 @@ end
 
 function GuiCanvas:Text(zIndex)
 	local label = Instance.new("TextLabel")
-	label.Name = "PhasmaText"
+	label.Name = self:_name("Text")
 	label.BackgroundTransparency = 1
 	label.BorderSizePixel = 0
 	label.RichText = false
@@ -234,7 +283,7 @@ function GuiCanvas:Text(zIndex)
 	label.Text = ""
 	label.TextSize = 13
 	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.3
+	label.TextStrokeTransparency = 0.45
 	label.TextStrokeColor3 = Constants.OutlineColor
 	label.TextXAlignment = Enum.TextXAlignment.Center
 	label.TextYAlignment = Enum.TextYAlignment.Center
@@ -254,6 +303,7 @@ function GuiCanvas:Text(zIndex)
 		TextSize = 13,
 		Centered = true,
 		Outline = true,
+		OutlineTransparency = 0.45,
 		OutlineColor = Constants.OutlineColor,
 		Position = Vector2.zero,
 	})
@@ -261,7 +311,7 @@ end
 
 function GuiCanvas:Circle(zIndex)
 	local frame = Instance.new("Frame")
-	frame.Name = "PhasmaCircle"
+	frame.Name = self:_name("Circle")
 	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.BorderSizePixel = 0
 	frame.BackgroundTransparency = 1

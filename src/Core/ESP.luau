@@ -4,6 +4,13 @@
 	Owns the render loop, the target entries and the shared settings. Every
 	frame resolves each target once and hands the result to that target's
 	elements. Players and, optionally, humanoid NPCs are both supported.
+
+	Efficiency notes:
+	  * entries own their frame state, so rendering allocates no tables
+	  * NPCs are tracked by events with a slow safety rescan
+	  * visibility raycasts are throttled per target
+	  * anything behind the camera is rejected with one projection
+
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
@@ -17,9 +24,9 @@ local Config = require("./Config")
 local Entry = require("./Entry")
 local Target = require("./Target")
 
--- NPC models are rescanned this often; a full descendant walk every frame is
--- too expensive on real maps.
-local NPC_RESCAN = 0.5
+-- Safety net for models that appear without a Humanoid descendant event. The
+-- event registry does the real work, so this walk stays rare.
+local NPC_RESCAN = 8
 
 local ESP = {}
 ESP.__index = ESP
@@ -27,17 +34,24 @@ ESP.__index = ESP
 function ESP.new(settings)
 	local self = setmetatable({}, ESP)
 	self.Settings = Config.resolve(settings)
-	self.Canvas = Canvas.new()
+	self.Canvas = Canvas.new(self.Settings.Security)
 	self._entries = {}
 	self._connections = {}
 	self._running = false
-	self._npcList = nil
+
+	self._npcSet = {}
+	self._npcReady = false
 	self._npcScan = 0
+
+	-- Reused every frame; clearing is cheaper than allocating.
+	self._seen = {}
+	self._characters = {}
+	self._filter = {}
 
 	self._rayParams = RaycastParams.new()
 	self._rayParams.FilterType = Enum.RaycastFilterType.Exclude
 	self._rayParams.IgnoreWater = true
-	self._rayParams.FilterDescendantsInstances = {}
+	self._rayParams.FilterDescendantsInstances = self._filter
 
 	return self
 end
@@ -48,12 +62,32 @@ function ESP:Start()
 	end
 	self._running = true
 
-	self._connections[#self._connections + 1] = RunService.RenderStepped:Connect(function()
-		self:Render()
+	self._connections[#self._connections + 1] = RunService.RenderStepped:Connect(function(delta)
+		self:Render(delta)
 	end)
 
 	self._connections[#self._connections + 1] = Players.PlayerRemoving:Connect(function(player)
 		self:_drop(player)
+	end)
+
+	-- Event-driven NPC registry. A model is registered when its Humanoid
+	-- appears, which covers streamed-in characters without polling the tree.
+	self._connections[#self._connections + 1] = workspace.DescendantAdded:Connect(function(instance)
+		if instance:IsA("Humanoid") then
+			local model = instance.Parent
+			if model and model:IsA("Model") then
+				self._npcSet[model] = true
+			end
+		end
+	end)
+
+	self._connections[#self._connections + 1] = workspace.DescendantRemoving:Connect(function(instance)
+		if instance:IsA("Humanoid") then
+			local model = instance.Parent
+			if model then
+				self._npcSet[model] = nil
+			end
+		end
 	end)
 end
 
@@ -78,45 +112,76 @@ function ESP:_hideAll()
 	end
 end
 
-function ESP:_npcs()
-	local now = os.clock()
-	if self._npcList and now - self._npcScan < NPC_RESCAN then
-		return self._npcList
-	end
-
-	local list = {}
+function ESP:_scanNPCs()
+	local set = self._npcSet
 	for _, instance in ipairs(workspace:GetDescendants()) do
-		if instance:IsA("Model") and instance:FindFirstChildOfClass("Humanoid") then
-			list[#list + 1] = instance
+		if instance:IsA("Humanoid") then
+			local model = instance.Parent
+			if model and model:IsA("Model") then
+				set[model] = true
+			end
 		end
 	end
-
-	self._npcList = list
-	self._npcScan = now
-	return list
+	self._npcReady = true
+	self._npcScan = os.clock()
 end
 
-function ESP:_draw(owner, character, player, camera, origin, settings, localCharacter)
+local function isVisible(esp, camera, character, head, localCharacter)
+	local filter = esp._filter
+	filter[1] = character
+	filter[2] = localCharacter
+	esp._rayParams.FilterDescendantsInstances = filter
+
+	local origin = camera.CFrame.Position
+	local result = workspace:Raycast(origin, head.Position - origin, esp._rayParams)
+	return result == nil
+end
+
+function ESP:_draw(owner, character, player, camera, origin, settings, localCharacter, delta)
 	local entry = self._entries[owner]
-	if entry and entry.Character ~= character then
+	if entry and (entry.Character ~= character or not entry:Valid()) then
 		entry:Destroy()
+		self._entries[owner] = nil
 		entry = nil
 	end
+
 	if not entry then
 		entry = Entry.new(self, owner, character)
+		if not entry then
+			return
+		end
 		self._entries[owner] = entry
 	end
 
+	entry.State.Delta = delta
 	local name = player and player.Name or character.Name
-	local state = Target.build(character, name, player, camera, origin, settings, self._rayParams, localCharacter)
-	if state and state.Visible then
+	if not Target.build(entry, name, player, camera, origin, settings) then
+		entry:Hide()
+		return
+	end
+
+	local state = entry.State
+	if settings.VisibilityCheck then
+		local now = os.clock()
+		local interval = settings.VisibilityInterval or 0.12
+		if now - entry.VisibleAt >= interval then
+			entry.Visible = isVisible(self, camera, character, entry.Head, localCharacter)
+			entry.VisibleAt = now
+		end
+		state.Visible = entry.Visible
+	else
+		entry.Visible = true
+		state.Visible = true
+	end
+
+	if state.Visible then
 		entry:Draw(state)
 	else
 		entry:Hide()
 	end
 end
 
-function ESP:Render()
+function ESP:Render(delta)
 	local settings = self.Settings
 	if not settings.Enabled then
 		self:_hideAll()
@@ -126,6 +191,7 @@ function ESP:Render()
 	local camera = Camera.get()
 	local localPlayer = Players.LocalPlayer
 	if not camera or not localPlayer then
+		self:_hideAll()
 		return
 	end
 
@@ -134,8 +200,10 @@ function ESP:Render()
 	local origin = localRoot and localRoot.Position or camera.CFrame.Position
 	local localTeam = localPlayer.Team
 
-	local seen = {}
-	local characters = {}
+	local seen = self._seen
+	local characters = self._characters
+	table.clear(seen)
+	table.clear(characters)
 
 	for _, player in ipairs(Players:GetPlayers()) do
 		seen[player] = true
@@ -152,22 +220,24 @@ function ESP:Render()
 		if skip or not character or not character.Parent then
 			self:_hide(player)
 		else
-			self:_draw(player, character, player, camera, origin, settings, localCharacter)
+			self:_draw(player, character, player, camera, origin, settings, localCharacter, delta)
 		end
 	end
 
 	if settings.IncludeNPCs then
-		for _, model in ipairs(self:_npcs()) do
-			if
-				not characters[model]
-				and model ~= localCharacter
-				and model.Parent
-				and not Players:GetPlayerFromCharacter(model)
-			then
+		local now = os.clock()
+		if not self._npcReady or now - self._npcScan >= NPC_RESCAN then
+			self:_scanNPCs()
+		end
+
+		for model in pairs(self._npcSet) do
+			if not model.Parent then
+				self._npcSet[model] = nil
+			elseif not characters[model] and model ~= localCharacter and not Players:GetPlayerFromCharacter(model) then
 				local humanoid = model:FindFirstChildOfClass("Humanoid")
 				if humanoid and model:FindFirstChild("HumanoidRootPart") then
 					seen[model] = true
-					self:_draw(model, model, nil, camera, origin, settings, localCharacter)
+					self:_draw(model, model, nil, camera, origin, settings, localCharacter, delta)
 				end
 			end
 		end
@@ -203,6 +273,8 @@ function ESP:Stop()
 		connection:Disconnect()
 	end
 	table.clear(self._connections)
+	table.clear(self._npcSet)
+	self._npcReady = false
 	self._running = false
 	self:_hideAll()
 end

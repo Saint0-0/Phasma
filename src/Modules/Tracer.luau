@@ -8,6 +8,8 @@
 
 local UserInputService = game:GetService("UserInputService")
 
+local Alpha = require("../Utils/Alpha")
+
 local Tracer = {}
 Tracer.__index = Tracer
 
@@ -39,7 +41,7 @@ function Tracer:Update(state)
 	self.Line.To = Vector2.new(state.Box.Center.X, state.Box.Position.Y + state.Box.Size.Y)
 	self.Line.Color = settings.Color
 	self.Line.Thickness = settings.Thickness
-	self.Line.Transparency = settings.Transparency
+	self.Line.Transparency = Alpha.apply(settings.Transparency, state.Alpha)
 	self.Line.Visible = true
 end
 

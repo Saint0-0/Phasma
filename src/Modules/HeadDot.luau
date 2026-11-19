@@ -6,6 +6,8 @@
 	Copyright (c) 2026 Saint0-0
 ]]
 
+local Alpha = require("../Utils/Alpha")
+
 local HeadDot = {}
 HeadDot.__index = HeadDot
 
@@ -28,7 +30,7 @@ function HeadDot:Update(state)
 	self.Dot.Color = settings.Color
 	self.Dot.Filled = settings.Filled
 	self.Dot.Thickness = 1
-	self.Dot.Transparency = settings.Transparency
+	self.Dot.Transparency = Alpha.apply(settings.Transparency, state.Alpha)
 	self.Dot.Visible = true
 end
 

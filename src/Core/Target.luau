@@ -1,9 +1,11 @@
 --[[
 	Phasma/Core/Target.luau
 
-	Resolves one player into everything the elements draw for a frame: the
+	Resolves one target into everything the elements draw for a frame: the
 	oriented bounding box in screen space, skeleton segments, distance and
-	health. Returns nil when the target should not be drawn.
+	health. Results are written into a reusable state table owned by the entry,
+	so a frame allocates no per-target tables.
+
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
@@ -11,6 +13,9 @@
 local Camera = require("./Camera")
 
 local Target = {}
+
+local MAX_BONES = 16
+local MAX_POINTS = 20
 
 -- Skeleton points come from Motor6D joints, not part centres: a joint sits
 -- where the limb actually pivots, so the sticks meet at the shoulders, elbows,
@@ -103,6 +108,58 @@ local R6_PART_SEGMENTS = {
 -- Joint instances never change for the lifetime of a character, so the
 -- recursive lookups happen once. Weak keys let dead characters drop out.
 local jointCache = setmetatable({}, { __mode = "k" })
+local partCache = setmetatable({}, { __mode = "k" })
+
+-- A reusable state table per entry. Every table is created once and filled in
+-- place on each frame.
+function Target.newState()
+	local bones = table.create(MAX_BONES)
+	for index = 1, MAX_BONES do
+		bones[index] = { From = Vector2.zero, To = Vector2.zero }
+	end
+
+	return {
+		Name = "",
+		Player = nil,
+		Character = nil,
+		Humanoid = nil,
+		Root = nil,
+		Head = nil,
+		Rig = "R6",
+		Distance = 0,
+		Health = 0,
+		MaxHealth = 0,
+		Box = { Position = Vector2.zero, Size = Vector2.zero, Center = Vector2.zero },
+		Bones = bones,
+		BoneCount = 0,
+		Points = table.create(MAX_POINTS, Vector2.zero),
+		PointCount = 0,
+		PointMap = {},
+		Screen = Vector2.zero,
+		Alpha = 1,
+		Delta = 0,
+		Visible = true,
+	}
+end
+
+local function partFor(character, name)
+	local map = partCache[character]
+	if not map then
+		map = {}
+		partCache[character] = map
+	end
+
+	local part = map[name]
+	if part == nil then
+		local found = character:FindFirstChild(name)
+		part = found and found:IsA("BasePart") and found or false
+		map[name] = part
+	end
+	if part == false or not part.Parent then
+		return nil
+	end
+	return part
+end
 
 local function jointsFor(character, names)
 	local map = jointCache[character]
@@ -136,40 +193,48 @@ local function projectJoint(camera, joint)
 end
 
 local function projectPartPoint(camera, character, partName, offsetY)
-	local part = character:FindFirstChild(partName)
-	if not part or not part:IsA("BasePart") then
+	local part = partFor(character, partName)
+	if not part then
 		return nil
 	end
 	local world = part.CFrame * Vector3.new(0, part.Size.Y * offsetY, 0)
 	return Camera.project(camera, world)
 end
 
-local function collectPartBones(character, camera, pairs)
-	local points = {}
+local function collectPartBones(state, character, camera, pairs)
+	local points = state.PointMap
+	table.clear(points)
+
 	for _, pair in ipairs(pairs) do
 		for _, name in ipairs(pair) do
 			if not points[name] then
-				local part = character:FindFirstChild(name)
-				if part and part:IsA("BasePart") then
+				local part = partFor(character, name)
+				if part then
 					points[name] = Camera.project(camera, part.Position)
 				end
 			end
 		end
 	end
 
-	local bones = {}
+	local bones = state.Bones
+	local count = 0
 	for _, pair in ipairs(pairs) do
 		local from = points[pair[1]]
 		local to = points[pair[2]]
-		if from and to then
-			bones[#bones + 1] = { From = from, To = to }
+		if from and to and count < MAX_BONES then
+			count = count + 1
+			local bone = bones[count]
+			bone.From = from
+			bone.To = to
 		end
 	end
-	return bones
+
+	return count
 end
 
-local function collectBones(character, camera, rig)
-	local points = {}
+local function collectBones(state, character, camera, rig)
+	local points = state.PointMap
+	table.clear(points)
 
 	if rig == "R15" then
 		for name, joint in pairs(jointsFor(character, R15_JOINTS)) do
@@ -187,25 +252,38 @@ local function collectBones(character, camera, rig)
 	points.HeadTop = projectPartPoint(camera, character, "Head", 0.5)
 
 	local segments = rig == "R15" and R15_SEGMENTS or R6_SEGMENTS
-	local bones = {}
+	local bones = state.Bones
+	local count = 0
 	for _, pair in ipairs(segments) do
 		local from = points[pair[1]]
 		local to = points[pair[2]]
-		if from and to then
-			bones[#bones + 1] = { From = from, To = to }
+		if from and to and count < MAX_BONES then
+			count = count + 1
+			local bone = bones[count]
+			bone.From = from
+			bone.To = to
 		end
 	end
 
-	if #bones == 0 then
+	if count == 0 then
 		local fallback = rig == "R15" and R15_PART_SEGMENTS or R6_PART_SEGMENTS
-		bones = collectPartBones(character, camera, fallback)
+		count = collectPartBones(state, character, camera, fallback)
 	end
 
-	return bones
+	-- Unique joint positions for the optional joint dots.
+	local pointCount = 0
+	for _, point in pairs(points) do
+		if point and pointCount < MAX_POINTS then
+			pointCount = pointCount + 1
+			state.Points[pointCount] = point
+		end
+	end
+
+	return count, pointCount
 end
 
--- Projects the eight corners of the character's oriented box.
-local function projectBox(character, camera)
+-- Projects the eight corners of the character's oriented box into `box`.
+local function projectBox(box, character, camera)
 	local boxCFrame, boxSize = character:GetBoundingBox()
 	local half = boxSize * 0.5
 
@@ -219,7 +297,7 @@ local function projectBox(character, camera)
 				local corner = boxCFrame * Vector3.new(x, y, z)
 				local screen = Camera.project(camera, corner)
 				if not screen then
-					return nil
+					return false
 				end
 				minX = minX and math.min(minX, screen.X) or screen.X
 				maxX = maxX and math.max(maxX, screen.X) or screen.X
@@ -230,77 +308,79 @@ local function projectBox(character, camera)
 	end
 
 	if not minX then
-		return nil
+		return false
 	end
-	return {
-		Position = Vector2.new(minX, minY),
-		Size = Vector2.new(maxX - minX, maxY - minY),
-		Center = Vector2.new((minX + maxX) * 0.5, (minY + maxY) * 0.5),
-	}
+
+	box.Position = Vector2.new(minX, minY)
+	box.Size = Vector2.new(maxX - minX, maxY - minY)
+	box.Center = Vector2.new((minX + maxX) * 0.5, (minY + maxY) * 0.5)
+	return true
 end
 
-local function isVisible(character, camera, head, rayParams, localCharacter)
-	local origin = camera.CFrame.Position
-	local filter = { character }
-	if localCharacter then
-		filter[2] = localCharacter
-	end
-	rayParams.FilterDescendantsInstances = filter
-	local result = workspace:Raycast(origin, head.Position - origin, rayParams)
-	return result == nil
-end
-
-function Target.build(character, name, player, camera, origin, settings, rayParams, localCharacter)
+-- Fills `entry.State` for this frame. Returns false when the target should not
+-- be drawn at all, in which case the entry is hidden.
+function Target.build(entry, name, player, camera, origin, settings)
+	local character = entry.Character
 	if not character or not character.Parent then
-		return nil
+		return false
 	end
 
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local root = character:FindFirstChild("HumanoidRootPart")
-	local head = character:FindFirstChild("Head")
-	if not humanoid or not root or not head or humanoid.Health <= 0 then
-		return nil
+	local humanoid = entry.Humanoid
+	local root = entry.Root
+	local head = entry.Head
+	if not humanoid or not root or not head or not root.Parent or not head.Parent then
+		return false
+	end
+	if humanoid.Health <= 0 then
+		return false
+	end
+
+	-- One projection is enough to reject anything behind the camera before
+	-- the bounding box does eight of them.
+	if not Camera.project(camera, root.Position) then
+		return false
 	end
 
 	local distance = (root.Position - origin).Magnitude
 	if distance > settings.MaxDistance then
-		return nil
+		return false
 	end
 
-	local box = projectBox(character, camera)
-	if not box then
-		return nil
-	end
-
-	local rig = character:FindFirstChild("UpperTorso") and "R15" or "R6"
-	local bones = {}
-	if settings.Skeleton and settings.Skeleton.Enabled then
-		bones = collectBones(character, camera, rig)
+	local state = entry.State
+	if not projectBox(state.Box, character, camera) then
+		return false
 	end
 
 	local headScreen = Camera.project(camera, head.Position)
 
-	local visible = true
-	if settings.VisibilityCheck then
-		visible = isVisible(character, camera, head, rayParams, localCharacter)
+	state.Name = name
+	state.Player = player
+	state.Character = character
+	state.Humanoid = humanoid
+	state.Root = root
+	state.Head = head
+	state.Rig = entry.Rig
+	state.Distance = distance
+	state.Health = humanoid.Health
+	state.MaxHealth = humanoid.MaxHealth
+	state.Screen = headScreen or state.Box.Center
+
+	if settings.Skeleton and settings.Skeleton.Enabled then
+		state.BoneCount, state.PointCount = collectBones(state, character, camera, entry.Rig)
+	else
+		state.BoneCount = 0
+		state.PointCount = 0
 	end
 
-	return {
-		Name = name,
-		Player = player,
-		Character = character,
-		Humanoid = humanoid,
-		Root = root,
-		Head = head,
-		Rig = rig,
-		Distance = distance,
-		Health = humanoid.Health,
-		MaxHealth = humanoid.MaxHealth,
-		Box = box,
-		Bones = bones,
-		Screen = headScreen or box.Center,
-		Visible = visible,
-	}
+	local alpha = 1
+	if settings.FadeWithDistance and settings.MaxDistance > 0 then
+		local floor = settings.FadeFloor or 0.72
+		local ratio = math.clamp(distance / settings.MaxDistance, 0, 1)
+		alpha = 1 + (floor - 1) * ratio
+	end
+	state.Alpha = alpha
+
+	return true
 end
 
 return Target

@@ -6,7 +6,7 @@ The library is modular: each element is its own module, the rendering backend is
 
 ## Status
 
-Early. `v0.1.0` covers the render loop, the two backends and eight elements. The roadmap lives in `plan.md`.
+`v0.2.0` is the modernisation pass: corner-bracket boxes with a soft fill, a smoothed capsule health bar, distance fade, optional joint dots, an allocation-free render path and security defaults. The roadmap lives in `plan.md`.
 
 ## Load it
 
@@ -32,14 +32,16 @@ local esp = Phasma:CreateESP({
 	TeamCheck = false,
 	VisibilityCheck = false,
 
-	Box = { Enabled = true, Color = Color3.fromRGB(170, 205, 255) },
+	Box = { Enabled = true, Style = "Corners", Filled = true },
 	Name = { Enabled = true },
 	Distance = { Enabled = true },
 	Health = { Enabled = true },
 	Tracer = { Enabled = true, From = "Bottom" },
 	Skeleton = { Enabled = true },
 	HeadDot = { Enabled = true },
-	Highlight = { Enabled = false },
+	Highlight = { Enabled = true },
+
+	Security = { Enabled = true },
 })
 ```
 
@@ -68,27 +70,49 @@ Global:
 | `MaxDistance` | `1000` | Targets past this many studs are skipped. |
 | `TeamCheck` | `false` | Skips players on the local player's team. |
 | `VisibilityCheck` | `false` | Raycasts to the head and hides occluded targets. |
+| `VisibilityInterval` | `0.12` | Seconds between visibility raycasts for one target. |
 | `IgnoreLocal` | `true` | Keeps the local player out of the list. |
 | `IncludeNPCs` | `false` | Also draws humanoid models that are not player characters. |
+| `FadeWithDistance` | `true` | Far targets dim toward `FadeFloor` instead of staying at full brightness. |
+| `FadeFloor` | `0.72` | Alpha at `MaxDistance`; `1` disables the effect. |
 
 Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`.
 
 | Element | Keys |
 | --- | --- |
-| `Box` | `Enabled`, `Color`, `Thickness`, `Transparency`, `Filled` |
-| `Name` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `UseDisplayName`, `Offset` |
-| `Distance` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `Offset`, `Suffix`, `Scale` |
-| `Health` | `Enabled`, `Width`, `Gap`, `Transparency`, `Background`, `BackgroundTransparency`, `ShowText`, `TextSize` |
+| `Box` | `Enabled`, `Style` (`"Corners"`, `"Full"`, `"Both"`), `Color`, `Thickness`, `Transparency`, `Filled`, `FillTransparency`, `CornerScale`, `CornerMin`, `CornerMax` |
+| `Name` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `UseDisplayName`, `Offset` |
+| `Distance` | `Enabled`, `Color`, `TextSize`, `Transparency`, `Outline`, `OutlineTransparency`, `Offset`, `Suffix`, `Scale` |
+| `Health` | `Enabled`, `Width`, `Gap`, `Transparency`, `Background`, `BackgroundTransparency`, `ShowText`, `TextSize`, `Smoothing`, `Rounded` |
 | `Tracer` | `Enabled`, `Color`, `Thickness`, `Transparency`, `From` (`"Bottom"`, `"Center"`, `"Mouse"`) |
-| `Skeleton` | `Enabled`, `Color`, `Thickness`, `Transparency` |
+| `Skeleton` | `Enabled`, `Color`, `Thickness`, `Transparency`, `Joints`, `JointRadius` |
 | `HeadDot` | `Enabled`, `Color`, `Radius`, `Filled`, `Transparency` |
 | `Highlight` | `Enabled`, `Fill`, `Outline`, `FillTransparency`, `OutlineTransparency`, `DepthMode` (`"AlwaysOnTop"`, `"Occluded"`) |
 
 `Distance.Scale` converts studs into the displayed unit; `Suffix` defaults to `"m"` because that is what the scene expects, not because the math converts anything.
 
+`Health.Smoothing` is the convergence speed of the fill; `0` snaps instantly. `Health.Rounded` adds capsule end caps, which work identically on both backends because they are drawn as filled circles rather than UI corners.
+
+`Box.Style = "Corners"` is the default look: four brackets over a very faint fill. `"Full"` is a plain outline, and `"Both"` combines them. `CornerScale` sets the bracket length as a fraction of the shorter box side, clamped by `CornerMin` and `CornerMax`.
+
+## Security
+
+`Security` is on by default. It reduces casual detection; it is not invisibility, and no client-side library can hide from a determined anti-cheat.
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `Security.Enabled` | `true` | Master switch for the measures below. |
+| `Security.RandomizeNames` | `true` | Gives the ScreenGui and every overlay child a random tag instead of a `Phasma*` name. |
+| `Security.ProtectGui` | `true` | Calls `protectgui` (or `syn.protect_gui`) so game scripts cannot reach the overlay. |
+| `Security.HideHighlight` | `true` | Parents `Highlight` to the camera with an `Adornee`, so it is not a child of the character. |
+
+The GUI backend already prefers `gethui()` over `PlayerGui` when an executor exposes it. The Drawing backend creates no Instances at all, so it has no names to randomize.
+
+Because the overlay name is random by default, the dev panel's `overlay` counter can read `0`; its `esp` count is the authoritative one.
+
 ## Backends
 
-`Phasma.Canvas.new()` returns the backend:
+`Phasma.Canvas.new(security)` returns the backend:
 
 - **Drawing** when the executor exposes `Drawing.new`, which is the fast path and the one to prefer.
 - **Gui** otherwise, a `ScreenGui` of Frames, TextLabels and UIStrokes. This is what runs in Studio.
@@ -96,6 +120,18 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 Both expose the same object surface (`Line`, `Rect`, `Text`, `Circle`), so element modules never branch on the backend.
 
 Projection goes through `Camera:WorldToViewportPoint`, the inset-free space. That is the same space the Drawing API draws in and the same space a ScreenGui gets with `IgnoreGuiInset`, so both backends land on the same pixels. `WorldToScreenPoint` would push everything down by the top bar.
+
+## Performance
+
+The render path is built to stay flat as the target count grows:
+
+- Each `Entry` owns one reusable state table. Box, bones and joint points are written in place, so a frame allocates no per-target tables.
+- Canvas proxies compare the new value with the old one and skip the write. Constant properties like colour and thickness cost nothing after the first frame.
+- The bounding box rejects anything behind the camera with a single projection before it projects eight corners.
+- `VisibilityCheck` raycasts at most once per `VisibilityInterval` per target and reuses the result in between.
+- NPCs are tracked by `DescendantAdded` / `DescendantRemoving` events. A full `workspace:GetDescendants()` walk only runs as an 8-second safety net.
+- Skeleton joint dots are created on first use, so the default settings do not allocate 20 extra objects per target.
+- `Distance` and health text only rebuild their strings when the value changes.
 
 ## The test place
 
@@ -106,7 +142,7 @@ Projection goes through `Camera:WorldToViewportPoint`, the inset-free space. Tha
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
 - A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players.
 
-Controls: **RightAlt** hides or shows the panel, and every row in it toggles the matching setting on the next frame. The panel footer shows the active backend and the target count.
+Controls: **RightAlt** hides or shows the panel, and every row in it toggles the matching setting on the next frame. The panel footer shows the active backend, the target count and the live engine count.
 
 The panel is dev-only: nothing under `src/` requires it, so it is absent from `dist/Phasma.luau` and `dist/Phasma.rbxm`. `example/Phasma_Test.client.luau` is the standalone demo for releases and is no longer mapped into the place, since two ESP instances would draw everything twice.
 
@@ -136,7 +172,7 @@ tools\selene.exe example
 tools\selene.exe dev
 
 # bundle dist/Phasma.luau + dist/Phasma.rbxm
-tools\lune.exe run build\init.luau 0.1.0
+tools\lune.exe run build\init.luau 0.2.0
 
 # live loop: rebuild the bundle on save, and serve the place
 tools\darklua.exe process src/Init.luau dist/Phasma.luau -c build/darklua.json -w
@@ -173,7 +209,9 @@ src/
     Box.luau  Name.luau  Distance.luau  Health.luau
     Tracer.luau  Skeleton.luau  HeadDot.luau  Highlight.luau
   Utils/
-    Color.luau
+    Color.luau            health gradient
+    Alpha.luau            distance fade helper
+    Random.luau           random instance tags for security
 example/Phasma_Test.client.luau
 dev/DummySpawner.server.luau
 dev/PhasmaDebug.client.luau

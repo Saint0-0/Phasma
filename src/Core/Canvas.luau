@@ -11,11 +11,11 @@ local GuiCanvas = require("./Canvas/GuiCanvas")
 
 local Canvas = {}
 
-function Canvas.new()
+function Canvas.new(security)
 	if DrawingCanvas.available() then
 		return DrawingCanvas.new()
 	end
-	return GuiCanvas.new()
+	return GuiCanvas.new(security)
 end
 
 return Canvas

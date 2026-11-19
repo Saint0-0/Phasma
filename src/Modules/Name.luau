@@ -37,6 +37,7 @@ function Name:Update(state)
 	self.Text.Color = settings.Color
 	self.Text.Transparency = settings.Transparency
 	self.Text.Outline = settings.Outline
+	self.Text.OutlineTransparency = settings.OutlineTransparency or 0.45
 	self.Text.Position =
 		Vector2.new(state.Box.Center.X, state.Box.Position.Y - settings.Offset - settings.TextSize * 0.5)
 	self.Text.Visible = true

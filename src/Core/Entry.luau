@@ -1,12 +1,15 @@
 --[[
 	Phasma/Core/Entry.luau
 
-	One player's set of elements. Rebuilt whenever the character changes, so
-	element objects never outlive the rig they were made for.
+	One target's set of elements. Rebuilt whenever the character changes, so
+	element objects never outlive the rig they were made for. The entry also
+	owns the reusable frame state, which is why a frame allocates nothing.
+
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
 
+local Target = require("./Target")
 local Highlight = require("../Modules/Highlight")
 local Tracer = require("../Modules/Tracer")
 local Skeleton = require("../Modules/Skeleton")
@@ -32,9 +35,23 @@ local ORDER = {
 }
 
 function Entry.new(esp, owner, character)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local root = character:FindFirstChild("HumanoidRootPart")
+	local head = character:FindFirstChild("Head")
+	if not humanoid or not root or not head then
+		return nil
+	end
+
 	local self = setmetatable({}, Entry)
 	self.Owner = owner
 	self.Character = character
+	self.Humanoid = humanoid
+	self.Root = root
+	self.Head = head
+	self.Rig = character:FindFirstChild("UpperTorso") and "R15" or "R6"
+	self.State = Target.newState()
+	self.Visible = true
+	self.VisibleAt = 0
 	self.Elements = {}
 
 	for index, entry in ipairs(ORDER) do
@@ -51,6 +68,10 @@ function Entry.new(esp, owner, character)
 	end
 
 	return self
+end
+
+function Entry:Valid()
+	return self.Humanoid.Parent ~= nil and self.Root.Parent ~= nil and self.Head.Parent ~= nil
 end
 
 function Entry:Draw(state)

@@ -58,7 +58,13 @@ Object.__index = function(self, key)
 	return rawget(self, "_props")[key]
 end
 Object.__newindex = function(self, key, value)
-	rawset(rawget(self, "_props"), key, value)
+	local props = rawget(self, "_props")
+	-- Drawing property writes cross into the executor's renderer, so only push
+	-- values that actually changed.
+	if props[key] == value then
+		return
+	end
+	props[key] = value
 	local raw = rawget(self, "_raw")
 	if raw then
 		apply(raw, key, value)
