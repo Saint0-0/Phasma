@@ -39,7 +39,9 @@ local function updateLine(object)
 	local delta = to - from
 	local length = delta.Magnitude
 
-	frame.Position = UDim2.fromOffset(from.X, from.Y)
+	-- Rotation always pivots around the frame's centre, never its AnchorPoint,
+	-- so the frame is placed at the midpoint of the segment.
+	frame.Position = UDim2.fromOffset(from.X + delta.X * 0.5, from.Y + delta.Y * 0.5)
 	frame.Size = UDim2.fromOffset(length, props.Thickness)
 	frame.Rotation = math.deg(math.atan2(delta.Y, delta.X))
 	frame.BackgroundColor3 = props.Color
@@ -175,7 +177,7 @@ end
 function GuiCanvas:Line(zIndex)
 	local frame = Instance.new("Frame")
 	frame.Name = "PhasmaLine"
-	frame.AnchorPoint = Vector2.new(0, 0.5)
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
 	frame.BorderSizePixel = 0
 	frame.BackgroundColor3 = Color3.new(1, 1, 1)
 	frame.ZIndex = zIndex

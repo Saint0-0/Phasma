@@ -12,66 +12,132 @@ local Camera = require("./Camera")
 
 local Target = {}
 
-local R15_BONES = {
-	{ "Head", "UpperTorso" },
-	{ "UpperTorso", "LowerTorso" },
-	{ "UpperTorso", "LeftUpperArm" },
-	{ "LeftUpperArm", "LeftLowerArm" },
-	{ "LeftLowerArm", "LeftHand" },
-	{ "UpperTorso", "RightUpperArm" },
-	{ "RightUpperArm", "RightLowerArm" },
-	{ "RightLowerArm", "RightHand" },
-	{ "LowerTorso", "LeftUpperLeg" },
-	{ "LeftUpperLeg", "LeftLowerLeg" },
-	{ "LeftLowerLeg", "LeftFoot" },
-	{ "LowerTorso", "RightUpperLeg" },
-	{ "RightUpperLeg", "RightLowerLeg" },
-	{ "RightLowerLeg", "RightFoot" },
+-- Skeleton points come from Motor6D joints, not part centres: a joint sits
+-- where the limb actually pivots, so the sticks meet at the shoulders, elbows,
+-- hips and knees instead of floating inside each part.
+local R15_JOINTS = {
+	"Neck",
+	"Waist",
+	"LeftShoulder",
+	"LeftElbow",
+	"LeftWrist",
+	"RightShoulder",
+	"RightElbow",
+	"RightWrist",
+	"LeftHip",
+	"LeftKnee",
+	"LeftAnkle",
+	"RightHip",
+	"RightKnee",
+	"RightAnkle",
 }
 
-local R6_BONES = {
-	{ "Head", "Torso" },
-	{ "Torso", "Left Arm" },
-	{ "Torso", "Right Arm" },
-	{ "Torso", "Left Leg" },
-	{ "Torso", "Right Leg" },
+local R15_SEGMENTS = {
+	{ "Neck", "Waist" },
+	{ "Neck", "HeadTop" },
+	{ "Waist", "LeftShoulder" },
+	{ "LeftShoulder", "LeftElbow" },
+	{ "LeftElbow", "LeftWrist" },
+	{ "Waist", "RightShoulder" },
+	{ "RightShoulder", "RightElbow" },
+	{ "RightElbow", "RightWrist" },
+	{ "Waist", "LeftHip" },
+	{ "LeftHip", "LeftKnee" },
+	{ "LeftKnee", "LeftAnkle" },
+	{ "Waist", "RightHip" },
+	{ "RightHip", "RightKnee" },
+	{ "RightKnee", "RightAnkle" },
 }
 
--- Every part a skeleton can touch, in one list per rig.
-local R15_PARTS = {
-	"Head",
-	"UpperTorso",
-	"LowerTorso",
-	"LeftUpperArm",
-	"LeftLowerArm",
-	"LeftHand",
-	"RightUpperArm",
-	"RightLowerArm",
-	"RightHand",
-	"LeftUpperLeg",
-	"LeftLowerLeg",
-	"LeftFoot",
-	"RightUpperLeg",
-	"RightLowerLeg",
-	"RightFoot",
+-- R6 has one part per limb, so the hands and feet are part ends rather than
+-- joints.
+local R6_JOINTS = { "Neck", "RootJoint", "Left Shoulder", "Right Shoulder", "Left Hip", "Right Hip" }
+
+local R6_ENDS = {
+	{ Name = "LeftHand", Part = "Left Arm" },
+	{ Name = "RightHand", Part = "Right Arm" },
+	{ Name = "LeftFoot", Part = "Left Leg" },
+	{ Name = "RightFoot", Part = "Right Leg" },
 }
 
-local R6_PARTS = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
+local R6_SEGMENTS = {
+	{ "Neck", "RootJoint" },
+	{ "Neck", "HeadTop" },
+	{ "Neck", "Left Shoulder" },
+	{ "Neck", "Right Shoulder" },
+	{ "Left Shoulder", "LeftHand" },
+	{ "Right Shoulder", "RightHand" },
+	{ "RootJoint", "Left Hip" },
+	{ "RootJoint", "Right Hip" },
+	{ "Left Hip", "LeftFoot" },
+	{ "Right Hip", "RightFoot" },
+}
 
-local function collectBones(character, camera, parts, pairs)
-	local points = {}
-	for _, name in ipairs(parts) do
-		local part = character:FindFirstChild(name)
-		if part and part:IsA("BasePart") then
-			local screen = Camera.project(camera, part.Position)
-			if screen then
-				points[name] = screen
+-- Joint instances never change for the lifetime of a character, so the
+-- recursive lookups happen once. Weak keys let dead characters drop out.
+local jointCache = setmetatable({}, { __mode = "k" })
+
+local function jointsFor(character, names)
+	local map = jointCache[character]
+	if not map then
+		map = {}
+		jointCache[character] = map
+	end
+
+	for _, name in ipairs(names) do
+		local joint = map[name]
+		if not joint or not joint.Parent or not joint.Part0 then
+			joint = character:FindFirstChild(name, true)
+			if joint and joint:IsA("Motor6D") then
+				map[name] = joint
+			else
+				map[name] = nil
 			end
 		end
 	end
 
+	return map
+end
+
+-- World position of a joint: the Motor6D sits at Part0.CFrame * C0.
+local function projectJoint(camera, joint)
+	local part = joint.Part0
+	if not part then
+		return nil
+	end
+	return Camera.project(camera, (part.CFrame * joint.C0).Position)
+end
+
+local function projectPartPoint(camera, character, partName, offsetY)
+	local part = character:FindFirstChild(partName)
+	if not part or not part:IsA("BasePart") then
+		return nil
+	end
+	local world = part.CFrame * Vector3.new(0, part.Size.Y * offsetY, 0)
+	return Camera.project(camera, world)
+end
+
+local function collectBones(character, camera, rig)
+	local points = {}
+
+	if rig == "R15" then
+		for name, joint in pairs(jointsFor(character, R15_JOINTS)) do
+			points[name] = projectJoint(camera, joint)
+		end
+	else
+		for name, joint in pairs(jointsFor(character, R6_JOINTS)) do
+			points[name] = projectJoint(camera, joint)
+		end
+		for _, spec in ipairs(R6_ENDS) do
+			points[spec.Name] = projectPartPoint(camera, character, spec.Part, -0.5)
+		end
+	end
+
+	points.HeadTop = projectPartPoint(camera, character, "Head", 0.5)
+
+	local segments = rig == "R15" and R15_SEGMENTS or R6_SEGMENTS
 	local bones = {}
-	for _, pair in ipairs(pairs) do
+	for _, pair in ipairs(segments) do
 		local from = points[pair[1]]
 		local to = points[pair[2]]
 		if from and to then
@@ -152,11 +218,7 @@ function Target.build(character, name, player, camera, origin, settings, rayPara
 	local rig = character:FindFirstChild("UpperTorso") and "R15" or "R6"
 	local bones = {}
 	if settings.Skeleton and settings.Skeleton.Enabled then
-		if rig == "R15" then
-			bones = collectBones(character, camera, R15_PARTS, R15_BONES)
-		else
-			bones = collectBones(character, camera, R6_PARTS, R6_BONES)
-		end
+		bones = collectBones(character, camera, rig)
 	end
 
 	local headScreen = Camera.project(camera, head.Position)

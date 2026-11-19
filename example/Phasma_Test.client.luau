@@ -1,14 +1,12 @@
 --[[
 	Phasma/example/Phasma_Test.client.luau
 
-	Showcase config for the test place. RightShift toggles the ESP,
-	RightControl toggles the visibility check.
+	Showcase config for the test place.
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
 
 local Phasma = require(ReplicatedStorage:WaitForChild("Phasma"):WaitForChild("Init"))
 
@@ -53,17 +51,3 @@ local esp = Phasma:CreateESP({
 })
 
 print(("[Phasma] v%s running on the %s backend."):format(Phasma.Version, esp.Canvas.Kind))
-print("[Phasma] RightShift toggles the ESP, RightControl toggles the visibility check.")
-
-UserInputService.InputBegan:Connect(function(input, processed)
-	if processed then
-		return
-	end
-
-	if input.KeyCode == Enum.KeyCode.RightShift then
-		print("[Phasma] ESP", esp:Toggle() and "on" or "off")
-	elseif input.KeyCode == Enum.KeyCode.RightControl then
-		esp.Settings.VisibilityCheck = not esp.Settings.VisibilityCheck
-		print("[Phasma] visibility check", esp.Settings.VisibilityCheck and "on" or "off")
-	end
-end)
