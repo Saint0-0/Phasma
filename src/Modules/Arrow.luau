@@ -38,6 +38,12 @@ function Arrow:Update(state)
 		return
 	end
 
+	local progress = state.Anim and state.Anim.Arrow or 1
+	if progress <= 0.01 then
+		self:Hide()
+		return
+	end
+
 	local viewport = camera.ViewportSize
 	local direction = state.ArrowDirection
 	if direction.Magnitude < 0.001 then
@@ -56,6 +62,9 @@ function Arrow:Update(state)
 	local scaleY = math.abs(direction.Y) > 0.0001 and reach.Y / math.abs(direction.Y) or math.huge
 	local tip = viewport * 0.5 + direction * math.min(scaleX, scaleY)
 	tip = Vector2.new(math.clamp(tip.X, inset, viewport.X - inset), math.clamp(tip.Y, inset, viewport.Y - inset))
+	-- Slide in from outside the viewport as the target first goes off screen.
+	local entryPoint = tip + direction * (settings.Offset or 16)
+	tip = entryPoint + (tip - entryPoint) * progress
 
 	local perpendicular = Vector2.new(-direction.Y, direction.X)
 	local back = tip - direction * size
@@ -94,8 +103,8 @@ function Arrow:Update(state)
 		self.Text.Color = color
 		self.Text.Transparency = transparency
 		self.Text.Outline = true
-		self.Text.OutlineTransparency = 0.4
-		self.Text.Position = tip - direction * (settings.TextGap or 22)
+		self.Text.OutlineTransparency = Occlusion.transparency(Alpha.apply(0.4, state.Alpha), state, self.Global)
+		self.Text.Position = tip - direction * (settings.TextGap or 28)
 		self.Text.Visible = true
 	else
 		self.Text.Visible = false

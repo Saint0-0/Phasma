@@ -35,7 +35,7 @@ end
 
 function Skeleton:Update(state)
 	local settings = self.Settings
-	if not settings.Enabled then
+	if not settings.Enabled or not state.ShowSkeleton then
 		self:Hide()
 		return
 	end

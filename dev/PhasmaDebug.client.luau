@@ -34,12 +34,16 @@ local COLORS = {
 	KnobOff = Color3.fromRGB(150, 158, 172),
 }
 
-local ELEMENTS = { "Box", "Name", "Distance", "Health", "Tracer", "Skeleton", "HeadDot", "Highlight", "Arrow" }
+local ELEMENTS =
+	{ "Box", "Name", "Distance", "Health", "Tracer", "Skeleton", "HeadDot", "Highlight", "Direction", "Arrow" }
 local DISTANCES = { 250, 500, 1000, 2000 }
 local TABS = { "ESP", "STYLE", "ELEMENTS", "COLOURS" }
 
 -- Assigned once the library loads, so the row builders can close over it.
 local esp
+
+-- Every row registers its refresh here so a preset can repaint the panel.
+local refreshers = {}
 
 local function rounded(instance, radius)
 	local corner = Instance.new("UICorner")
@@ -118,7 +122,59 @@ local function toggleRow(parent, order, label, get, set)
 	end)
 
 	refresh()
+	refreshers[#refreshers + 1] = refresh
 	return row
+end
+
+local function segmentedRow(parent, order, values, get, set)
+	local holder = Instance.new("Frame")
+	holder.LayoutOrder = order
+	holder.BackgroundTransparency = 1
+	holder.Size = UDim2.new(1, 0, 0, 22)
+	holder.Parent = parent
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.Padding = UDim.new(0, 4)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = holder
+
+	local buttons = {}
+	local function refresh()
+		local current = get()
+		for value, button in pairs(buttons) do
+			local active = current == value
+			button.BackgroundColor3 = active and COLORS.Accent or COLORS.Row
+			button.TextColor3 = active and COLORS.KnobOn or COLORS.Text
+		end
+	end
+
+	for index, value in ipairs(values) do
+		local button = Instance.new("TextButton")
+		button.Name = tostring(value)
+		button.LayoutOrder = index
+		button.Size = UDim2.new(1 / #values, -4, 1, 0)
+		button.BackgroundColor3 = COLORS.Row
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = false
+		button.Font = Enum.Font.GothamMedium
+		button.TextSize = 10
+		button.TextColor3 = COLORS.Text
+		button.Text = tostring(value)
+		button.Parent = holder
+		rounded(button, 4)
+
+		button.MouseButton1Click:Connect(function()
+			set(value)
+			refresh()
+		end)
+
+		buttons[value] = button
+	end
+
+	refresh()
+	refreshers[#refreshers + 1] = refresh
+	return holder
 end
 
 local function distanceRow(parent, order)
@@ -169,6 +225,7 @@ local function distanceRow(parent, order)
 	end
 
 	refresh()
+	refreshers[#refreshers + 1] = refresh
 	return holder
 end
 
@@ -386,6 +443,7 @@ local created, result = pcall(function()
 	return Phasma:CreateESP({
 		MaxDistance = 1200,
 		IncludeNPCs = true, -- the dummies are humanoid models, not players
+		Animations = { Enabled = true },
 		Box = { Enabled = true, Color = Color3.fromRGB(170, 205, 255) },
 		Name = { Enabled = true },
 		Distance = { Enabled = true },
@@ -393,7 +451,9 @@ local created, result = pcall(function()
 		Tracer = { Enabled = true, From = "Bottom" },
 		Skeleton = { Enabled = true },
 		HeadDot = { Enabled = true },
+		Direction = { Enabled = true },
 		Highlight = { Enabled = true, FillTransparency = 0.75, OutlineTransparency = 0.1 },
+		Objects = { Enabled = true, MaxDistance = 900, Tags = { "PhasmaLoot" }, Classes = { "Model" } },
 	})
 end)
 
@@ -404,6 +464,47 @@ if not created then
 end
 
 esp = result
+
+local function presetRow(parent, order)
+	local holder = Instance.new("Frame")
+	holder.LayoutOrder = order
+	holder.BackgroundTransparency = 1
+	holder.Size = UDim2.new(1, 0, 0, 104)
+	holder.Parent = parent
+
+	local grid = Instance.new("UIGridLayout")
+	grid.CellSize = UDim2.new(0.5, -3, 0, 22)
+	grid.CellPadding = UDim2.fromOffset(6, 4)
+	grid.SortOrder = Enum.SortOrder.LayoutOrder
+	grid.Parent = holder
+
+	for index, name in ipairs(esp:ListPresets()) do
+		local button = Instance.new("TextButton")
+		button.Name = name
+		button.LayoutOrder = index
+		button.BackgroundColor3 = COLORS.Row
+		button.BorderSizePixel = 0
+		button.AutoButtonColor = false
+		button.Font = Enum.Font.GothamMedium
+		button.TextSize = 10
+		button.TextColor3 = COLORS.Text
+		button.Text = name
+		button.Parent = holder
+		rounded(button, 4)
+
+		button.MouseButton1Click:Connect(function()
+			if esp:ApplyPreset(name) then
+				status.Text = "preset: " .. name
+				for _, refresh in ipairs(refreshers) do
+					refresh()
+				end
+				print("[Phasma] preset = " .. name)
+			end
+		end)
+	end
+
+	return holder
+end
 
 -- ESP ----------------------------------------------------------------------
 local espPage = makePage("ESP")
@@ -435,6 +536,54 @@ end, function(value)
 end)
 sectionLabel(espPage, nextOrder(espPage), "MAX DISTANCE")
 distanceRow(espPage, nextOrder(espPage))
+
+sectionLabel(espPage, nextOrder(espPage), "PRESETS")
+presetRow(espPage, nextOrder(espPage))
+
+sectionLabel(espPage, nextOrder(espPage), "FILTERS")
+toggleRow(espPage, nextOrder(espPage), "Filters", function()
+	return esp.Settings.Filters.Enabled
+end, function(value)
+	esp.Settings.Filters.Enabled = value
+end)
+sectionLabel(espPage, nextOrder(espPage), "MAX TARGETS")
+segmentedRow(espPage, nextOrder(espPage), { 0, 8, 16, 32 }, function()
+	return esp.Settings.Filters.MaxTargets
+end, function(value)
+	esp.Settings.Filters.MaxTargets = value
+end)
+sectionLabel(espPage, nextOrder(espPage), "PRIORITY")
+segmentedRow(espPage, nextOrder(espPage), { "Distance", "Health", "Name" }, function()
+	return esp.Settings.Filters.Priority
+end, function(value)
+	esp.Settings.Filters.Priority = value
+end)
+
+sectionLabel(espPage, nextOrder(espPage), "LOD")
+toggleRow(espPage, nextOrder(espPage), "Level of detail", function()
+	return esp.Settings.LOD.Enabled
+end, function(value)
+	esp.Settings.LOD.Enabled = value
+end)
+sectionLabel(espPage, nextOrder(espPage), "DETAIL DISTANCE")
+segmentedRow(espPage, nextOrder(espPage), { 300, 600, 900, 1200 }, function()
+	return esp.Settings.LOD.DetailDistance
+end, function(value)
+	esp.Settings.LOD.DetailDistance = value
+end)
+
+sectionLabel(espPage, nextOrder(espPage), "OBJECTS")
+toggleRow(espPage, nextOrder(espPage), "Object ESP", function()
+	return esp.Settings.Objects.Enabled
+end, function(value)
+	esp.Settings.Objects.Enabled = value
+end)
+sectionLabel(espPage, nextOrder(espPage), "OBJECT DISTANCE")
+segmentedRow(espPage, nextOrder(espPage), { 300, 600, 900, 1200 }, function()
+	return esp.Settings.Objects.MaxDistance
+end, function(value)
+	esp.Settings.Objects.MaxDistance = value
+end)
 
 -- STYLE --------------------------------------------------------------------
 local stylePage = makePage("STYLE")
@@ -475,6 +624,45 @@ toggleRow(stylePage, nextOrder(stylePage), "Joint dots", function()
 end, function(value)
 	esp.Settings.Skeleton.Joints = value
 end)
+toggleRow(stylePage, nextOrder(stylePage), "Animations", function()
+	return esp.Settings.Animations.Enabled
+end, function(value)
+	esp.Settings.Animations.Enabled = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Tracer anim", function()
+	return esp.Settings.Animations.Tracer
+end, function(value)
+	esp.Settings.Animations.Tracer = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Arrow anim", function()
+	return esp.Settings.Animations.Arrow
+end, function(value)
+	esp.Settings.Animations.Arrow = value
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Horizontal health", function()
+	return esp.Settings.Health.Style == "Horizontal"
+end, function(value)
+	esp.Settings.Health.Style = value and "Horizontal" or "Vertical"
+end)
+toggleRow(stylePage, nextOrder(stylePage), "Armour bar", function()
+	return esp.Settings.Health.Secondary.Enabled
+end, function(value)
+	esp.Settings.Health.Secondary.Enabled = value
+end)
+
+sectionLabel(stylePage, nextOrder(stylePage), "HEALTH TEXT SIDE")
+segmentedRow(stylePage, nextOrder(stylePage), { "Left", "Right", "Above", "Below" }, function()
+	return esp.Settings.Health.TextSide
+end, function(value)
+	esp.Settings.Health.TextSide = value
+end)
+
+sectionLabel(stylePage, nextOrder(stylePage), "TRACER ORIGIN")
+segmentedRow(stylePage, nextOrder(stylePage), { "Bottom", "Top", "Left", "Right", "Center", "Mouse" }, function()
+	return esp.Settings.Tracer.From
+end, function(value)
+	esp.Settings.Tracer.From = value
+end)
 
 -- ELEMENTS -----------------------------------------------------------------
 local elementsPage = makePage("ELEMENTS")
@@ -495,6 +683,7 @@ local COLOUR_TARGETS = {
 	{ Name = "Tracer", Table = "Tracer", Key = "Color" },
 	{ Name = "Skeleton", Table = "Skeleton", Key = "Color" },
 	{ Name = "HeadDot", Table = "HeadDot", Key = "Color" },
+	{ Name = "Direction", Table = "Direction", Key = "Color" },
 	{ Name = "Health bg", Table = "Health", Key = "Background" },
 	{ Name = "HL fill", Table = "Highlight", Key = "Fill" },
 	{ Name = "HL outline", Table = "Highlight", Key = "Outline" },
@@ -507,7 +696,7 @@ sectionLabel(colourPage, nextOrder(colourPage), "TARGET")
 local chipHolder = Instance.new("Frame")
 chipHolder.LayoutOrder = nextOrder(colourPage)
 chipHolder.BackgroundTransparency = 1
-chipHolder.Size = UDim2.new(1, 0, 0, 126)
+chipHolder.Size = UDim2.new(1, 0, 0, 156)
 chipHolder.Parent = colourPage
 
 local chipGrid = Instance.new("UIGridLayout")

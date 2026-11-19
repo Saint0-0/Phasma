@@ -46,14 +46,18 @@ function Box:Update(state)
 	end
 
 	local box = state.Box
+	local scale = state.Anim and state.Anim.Scale or 1
+	local center = box.Center
+	local position = center + (box.Position - center) * scale
+	local size = box.Size * scale
 	local alpha = state.Alpha
 	local color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
 	local thickness = settings.Thickness
 	local transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, alpha), state, self.Global)
 
 	if settings.Glow then
-		self.Glow.Position = box.Position
-		self.Glow.Size = box.Size
+		self.Glow.Position = position
+		self.Glow.Size = size
 		self.Glow.Color = color
 		self.Glow.Thickness = settings.GlowThickness or 3
 		self.Glow.Transparency =
@@ -65,8 +69,8 @@ function Box:Update(state)
 	end
 
 	if settings.Filled then
-		self.Fill.Position = box.Position
-		self.Fill.Size = box.Size
+		self.Fill.Position = position
+		self.Fill.Size = size
 		self.Fill.Color = color
 		self.Fill.Transparency =
 			Occlusion.transparency(Alpha.apply(settings.FillTransparency, alpha), state, self.Global)
@@ -81,8 +85,8 @@ function Box:Update(state)
 	local showCorners = style == "Corners" or style == "Both"
 
 	if showFull then
-		self.Full.Position = box.Position
-		self.Full.Size = box.Size
+		self.Full.Position = position
+		self.Full.Size = size
 		self.Full.Color = color
 		self.Full.Thickness = thickness
 		self.Full.Transparency = transparency
@@ -92,10 +96,10 @@ function Box:Update(state)
 		self.Full.Visible = false
 	end
 
-	local x = box.Position.X
-	local y = box.Position.Y
-	local width = box.Size.X
-	local height = box.Size.Y
+	local x = position.X
+	local y = position.Y
+	local width = size.X
+	local height = size.Y
 
 	local length = math.min(width, height) * (settings.CornerScale or 0.22)
 	local minLength = settings.CornerMin or 5

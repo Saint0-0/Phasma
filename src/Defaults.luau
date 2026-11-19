@@ -33,6 +33,55 @@ local Defaults = {
 	FadeWithDistance = true,
 	FadeFloor = 0.72,
 
+	-- Target-level transitions. Exponential convergence rather than
+	-- TweenService: Drawing objects are not Instances.
+	Animations = {
+		Enabled = true,
+		-- Higher converges faster; 0 snaps.
+		Speed = 12,
+		-- Pixels the name and distance slide while fading in.
+		Slide = 8,
+		-- Fraction the box shrinks by at the start of a fade-in.
+		Pop = 0.06,
+		Tracer = true,
+		Arrow = true,
+	},
+
+	-- Optional target whitelist/blacklist and per-frame cap.
+	Filters = {
+		Enabled = false,
+		Whitelist = {},
+		Blacklist = {},
+		NameContains = "",
+		-- 0 keeps every matching target.
+		MaxTargets = 0,
+		-- Distance, Health or Name.
+		Priority = "Distance",
+	},
+
+	-- Cheap detail beyond DetailDistance: hide the expensive elements and
+	-- rebuild far targets less often.
+	LOD = {
+		Enabled = true,
+		DetailDistance = 600,
+		Skeleton = false,
+		Chips = false,
+		Tracer = false,
+		UpdateInterval = 0.05,
+	},
+
+	-- Object ESP: models or parts matched by name, class or CollectionService
+	-- tag, drawn with Box, Name, Distance and Arrow.
+	Objects = {
+		Enabled = false,
+		MaxDistance = 1000,
+		ScanInterval = 0.5,
+		Names = {},
+		Classes = { "Model" },
+		Tags = {},
+		Color = Palette.Muted,
+	},
+
 	Box = {
 		Enabled = true,
 		-- "Corners" is the modern bracket look; "Full" is a plain outline and
@@ -93,11 +142,25 @@ local Defaults = {
 		ShowText = false,
 		Percent = false,
 		TextSize = 11,
+		-- "Vertical" is the classic bar beside the box; "Horizontal" is a
+		-- strip under it.
+		Style = "Vertical",
+		-- Left, Right, Above or Below, relative to the bar.
+		TextSide = "Left",
 		-- Higher converges faster. 0 disables smoothing.
 		Smoothing = 14,
 		Rounded = true,
 		-- Breathe the fill when the target is below a quarter health.
 		Pulse = true,
+		-- Optional second bar from a Humanoid attribute, for games that
+		-- expose armour or shields.
+		Secondary = {
+			Enabled = false,
+			Attribute = "Armor",
+			MaxAttribute = "MaxArmor",
+			Color = Color3.fromRGB(120, 180, 255),
+			Transparency = 0.2,
+		},
 	},
 
 	Tracer = {
@@ -105,6 +168,7 @@ local Defaults = {
 		Color = Palette.Tracer,
 		Thickness = 1,
 		Transparency = 0.35,
+		-- Bottom, Top, Left, Right, Center or Mouse.
 		From = "Bottom",
 	},
 
@@ -127,11 +191,27 @@ local Defaults = {
 
 	Highlight = {
 		Enabled = true,
+		-- Custom, Solid, Outline, Glow or Soft. A preset overrides the four
+		-- colour/transparency keys below.
+		Preset = "Custom",
+		UseTeamColor = true,
+		-- The engine only keeps 31 Highlights alive.
+		MaxInstances = 31,
 		Fill = Palette.HighlightFill,
 		Outline = Palette.HighlightOutline,
 		FillTransparency = 0.85,
 		OutlineTransparency = 0.35,
 		DepthMode = "AlwaysOnTop",
+	},
+
+	-- Small chevron above the box showing where the target is facing.
+	Direction = {
+		Enabled = true,
+		Color = Palette.Accent,
+		Size = 6,
+		Thickness = 2,
+		Transparency = 0.1,
+		Offset = 4,
 	},
 
 	-- Edge chevrons for targets outside the viewport, including behind you.
@@ -146,7 +226,8 @@ local Defaults = {
 		-- Shows the target distance just inside the arrow.
 		Label = true,
 		TextSize = 11,
-		TextGap = 22,
+		-- Distance from the tip back toward the viewport centre.
+		TextGap = 28,
 	},
 
 	-- Reduces casual detection only. Nothing client-side can hide from a

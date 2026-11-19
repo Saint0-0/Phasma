@@ -40,4 +40,34 @@ function Config.resolve(settings)
 	return merge(Defaults, isPlainTable(settings) and settings or {})
 end
 
+local function copy(value)
+	if not isPlainTable(value) then
+		return value
+	end
+	local out = {}
+	for key, nested in pairs(value) do
+		out[key] = copy(nested)
+	end
+	return out
+end
+
+-- Writes `source` into `target` in place. Element modules keep references to
+-- the settings sub-tables, so replacing the root table would strand them.
+function Config.apply(target, source)
+	if not isPlainTable(target) or not isPlainTable(source) then
+		return target
+	end
+
+	for key, value in pairs(source) do
+		local current = target[key]
+		if isPlainTable(value) and isPlainTable(current) then
+			Config.apply(current, value)
+		else
+			target[key] = copy(value)
+		end
+	end
+
+	return target
+end
+
 return Config

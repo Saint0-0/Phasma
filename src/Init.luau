@@ -10,6 +10,7 @@
 
 local Constants = require("./Constants")
 local Defaults = require("./Defaults")
+local Presets = require("./Presets")
 local Canvas = require("./Core/Canvas")
 local ESP = require("./Core/ESP")
 
@@ -17,6 +18,7 @@ local Phasma = {}
 
 Phasma.Version = Constants.Version
 Phasma.Defaults = Defaults
+Phasma.Presets = Presets
 Phasma.Canvas = Canvas
 
 -- Every ESP created through this module. Weak keys let destroyed instances

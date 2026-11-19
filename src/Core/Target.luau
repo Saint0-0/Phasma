@@ -159,11 +159,22 @@ function Target.newState()
 		PointMap = {},
 		Screen = Vector2.zero,
 		Alpha = 1,
+		BaseAlpha = 1,
 		Delta = 0,
 		Visible = true,
 		Occluded = false,
 		Offscreen = false,
 		ArrowDirection = Vector2.zero,
+		-- Facing direction in screen space, used by the Direction element.
+		Facing = Vector2.zero,
+		FacingValid = false,
+		-- LOD flags; true keeps the element at every distance.
+		Detail = true,
+		ShowSkeleton = true,
+		ShowChips = true,
+		ShowTracer = true,
+		-- Injected by Entry so elements can read the transition progress.
+		Anim = nil,
 		-- Resolved once per frame; nil means "use the element colour".
 		TeamColor = nil,
 	}
@@ -311,14 +322,14 @@ end
 
 -- When the camera is inside the rig, a corner sits behind the near plane and
 -- its projection flips. Fall back to a distance-scaled screen box centred on
--- the root so the box shrinks from huge to normal instead of vanishing.
-local function projectNearBox(box, camera, root, size)
-	local screen = Camera.project(camera, root.Position)
+-- `position` so the box shrinks from huge to normal instead of vanishing.
+local function projectNearBox(box, camera, position, size)
+	local screen = Camera.project(camera, position)
 	if not screen then
 		return false
 	end
 
-	local distance = (root.Position - camera.CFrame.Position).Magnitude
+	local distance = (position - camera.CFrame.Position).Magnitude
 	local viewport = camera.ViewportSize
 	local pixelsPerStud = (viewport.Y * 0.5) / math.tan(math.rad(camera.FieldOfView * 0.5))
 	local scale = pixelsPerStud / math.max(distance, 0.5)
@@ -330,6 +341,40 @@ local function projectNearBox(box, camera, root, size)
 	box.Position = center - Vector2.new(width * 0.5, height * 0.5)
 	box.Size = Vector2.new(width, height)
 	box.Center = center
+	return true
+end
+
+-- Projects the eight corners of an oriented box. Shared by humanoids and
+-- objects, which only differ in how their CFrame and size are found.
+local function projectCorners(box, boxCFrame, size, camera, fallbackPosition)
+	local half = size * 0.5
+
+	local minX, minY, maxX, maxY
+	for xi = 0, 1 do
+		local x = xi == 0 and -half.X or half.X
+		for yi = 0, 1 do
+			local y = yi == 0 and -half.Y or half.Y
+			for zi = 0, 1 do
+				local z = zi == 0 and -half.Z or half.Z
+				local screen = Camera.project(camera, boxCFrame * Vector3.new(x, y, z))
+				if not screen then
+					return projectNearBox(box, camera, fallbackPosition, size)
+				end
+				minX = minX and math.min(minX, screen.X) or screen.X
+				maxX = maxX and math.max(maxX, screen.X) or screen.X
+				minY = minY and math.min(minY, screen.Y) or screen.Y
+				maxY = maxY and math.max(maxY, screen.Y) or screen.Y
+			end
+		end
+	end
+
+	if not minX then
+		return false
+	end
+
+	box.Position = Vector2.new(minX, minY)
+	box.Size = Vector2.new(maxX - minX, maxY - minY)
+	box.Center = Vector2.new((minX + maxX) * 0.5, (minY + maxY) * 0.5)
 	return true
 end
 
@@ -379,36 +424,104 @@ local function projectBox(box, entry, camera)
 
 	local center = (min + max) * 0.5
 	local size = max - min
-	local boxCFrame = root.CFrame * CFrame.new(center)
-	local half = size * 0.5
+	return projectCorners(box, root.CFrame * CFrame.new(center), size, camera, root.Position)
+end
 
-	local minX, minY, maxX, maxY
-	for xi = 0, 1 do
-		local x = xi == 0 and -half.X or half.X
-		for yi = 0, 1 do
-			local y = yi == 0 and -half.Y or half.Y
-			for zi = 0, 1 do
-				local z = zi == 0 and -half.Z or half.Z
-				local screen = Camera.project(camera, boxCFrame * Vector3.new(x, y, z))
-				if not screen then
-					return projectNearBox(box, camera, root, size)
-				end
-				minX = minX and math.min(minX, screen.X) or screen.X
-				maxX = maxX and math.max(maxX, screen.X) or screen.X
-				minY = minY and math.min(minY, screen.Y) or screen.Y
-				maxY = maxY and math.max(maxY, screen.Y) or screen.Y
-			end
+-- Distance fade shared by characters and objects.
+local function distanceAlpha(settings, distance, maxDistance)
+	local alpha = 1
+	local limit = maxDistance or settings.MaxDistance
+	if settings.FadeWithDistance and limit and limit > 0 then
+		local floor = settings.FadeFloor or 0.72
+		local ratio = math.clamp(distance / limit, 0, 1)
+		alpha = 1 + (floor - 1) * ratio
+	end
+	return alpha
+end
+
+-- Detail flags for the current distance. `Detail` gates the expensive
+-- elements; each LOD key can opt back in at range.
+local function applyLOD(state, settings, distance)
+	local lod = settings.LOD
+	if not lod or not lod.Enabled then
+		state.Detail = true
+		state.ShowSkeleton = true
+		state.ShowChips = true
+		state.ShowTracer = true
+		return
+	end
+
+	local detail = distance <= (lod.DetailDistance or 600)
+	state.Detail = detail
+	state.ShowSkeleton = detail or lod.Skeleton == true
+	state.ShowChips = detail or lod.Chips == true
+	state.ShowTracer = detail or lod.Tracer == true
+end
+
+-- Decides whether the target is inside the viewport and, when it is not,
+-- stores the direction the edge arrow should point.
+local function resolveScreen(state, camera, position, positionScreen, boxOk)
+	local viewport = camera.ViewportSize
+	local centre = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+	local onScreen
+	if boxOk then
+		local box = state.Box
+		onScreen = box.Position.X <= viewport.X
+			and box.Position.X + box.Size.X >= 0
+			and box.Position.Y <= viewport.Y
+			and box.Position.Y + box.Size.Y >= 0
+	elseif positionScreen then
+		onScreen = positionScreen.X >= 0
+			and positionScreen.X <= viewport.X
+			and positionScreen.Y >= 0
+			and positionScreen.Y <= viewport.Y
+	else
+		onScreen = false
+	end
+
+	state.Offscreen = not onScreen
+	if not state.Offscreen then
+		return
+	end
+
+	if positionScreen then
+		local delta = positionScreen - centre
+		if delta.Magnitude < 1 then
+			state.ArrowDirection = Vector2.new(0, 1)
+		else
+			state.ArrowDirection = delta.Unit
+		end
+	else
+		-- Behind the camera: bias the arrow to the side that needs turning.
+		local localPos = camera.CFrame:PointToObjectSpace(position)
+		if math.abs(localPos.X) < 0.5 then
+			state.ArrowDirection = Vector2.new(0, 1)
+		else
+			state.ArrowDirection = Vector2.new(localPos.X * 0.35, 1).Unit
 		end
 	end
+end
 
-	if not minX then
-		return false
+-- Projects the facing vector into screen space. A target looking straight at
+-- the camera has almost no screen-space direction, so the marker hides.
+local function resolveFacing(state, camera, cframe, cframeScreen)
+	state.FacingValid = false
+	if not cframeScreen then
+		return
 	end
 
-	box.Position = Vector2.new(minX, minY)
-	box.Size = Vector2.new(maxX - minX, maxY - minY)
-	box.Center = Vector2.new((minX + maxX) * 0.5, (minY + maxY) * 0.5)
-	return true
+	local front = Camera.project(camera, cframe.Position + cframe.LookVector * 3)
+	if not front then
+		return
+	end
+
+	local delta = front - cframeScreen
+	if delta.Magnitude < 0.5 then
+		return
+	end
+
+	state.Facing = delta.Unit
+	state.FacingValid = true
 end
 
 -- Fills `entry.State` for this frame. Returns false when the target should not
@@ -451,6 +564,8 @@ function Target.build(entry, name, player, camera, origin, settings)
 	state.Health = humanoid.Health
 	state.MaxHealth = humanoid.MaxHealth
 	state.Screen = headScreen or rootScreen or Vector2.zero
+	state.BaseAlpha = distanceAlpha(settings, distance)
+	state.Alpha = state.BaseAlpha
 
 	-- A team colour overrides the element colours for the box, name, tracer,
 	-- skeleton and head dot. NPCs and teamless players keep the settings colour.
@@ -460,58 +575,71 @@ function Target.build(entry, name, player, camera, origin, settings)
 		state.TeamColor = nil
 	end
 
-	-- Off-screen targets keep a direction instead of a box, which the arrow
-	-- element turns into a chevron on the viewport edge.
-	local viewport = camera.ViewportSize
-	local centre = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
-	local onScreen
-	if boxOk then
-		local box = state.Box
-		onScreen = box.Position.X <= viewport.X
-			and box.Position.X + box.Size.X >= 0
-			and box.Position.Y <= viewport.Y
-			and box.Position.Y + box.Size.Y >= 0
-	elseif rootScreen then
-		onScreen = rootScreen.X >= 0 and rootScreen.X <= viewport.X and rootScreen.Y >= 0 and rootScreen.Y <= viewport.Y
-	else
-		onScreen = false
-	end
+	applyLOD(state, settings, distance)
+	resolveScreen(state, camera, root.Position, rootScreen, boxOk)
+	resolveFacing(state, camera, head.CFrame, headScreen)
 
-	state.Offscreen = not onScreen
-	if state.Offscreen then
-		if rootScreen then
-			local delta = rootScreen - centre
-			if delta.Magnitude < 1 then
-				state.ArrowDirection = Vector2.new(0, 1)
-			else
-				state.ArrowDirection = delta.Unit
-			end
-		else
-			-- Behind the camera: bias the arrow to the side that needs turning.
-			local localPos = camera.CFrame:PointToObjectSpace(root.Position)
-			if math.abs(localPos.X) < 0.5 then
-				state.ArrowDirection = Vector2.new(0, 1)
-			else
-				state.ArrowDirection = Vector2.new(localPos.X * 0.35, 1).Unit
-			end
-		end
-	end
-
-	if onScreen and settings.Skeleton and settings.Skeleton.Enabled then
+	if not state.Offscreen and state.ShowSkeleton and settings.Skeleton and settings.Skeleton.Enabled then
 		state.BoneCount, state.PointCount = collectBones(state, character, camera, entry.Rig)
 	else
 		state.BoneCount = 0
 		state.PointCount = 0
 	end
 
-	local alpha = 1
-	if settings.FadeWithDistance and settings.MaxDistance > 0 then
-		local floor = settings.FadeFloor or 0.72
-		local ratio = math.clamp(distance / settings.MaxDistance, 0, 1)
-		alpha = 1 + (floor - 1) * ratio
-	end
-	state.Alpha = alpha
+	return true
+end
 
+-- Fills the state for a non-humanoid Model or BasePart. Objects share the
+-- Box, Name, Distance and Arrow elements but never get a skeleton or health.
+function Target.buildObject(entry, name, object, camera, origin, settings)
+	if not object or not object.Parent then
+		return false
+	end
+
+	local boxCFrame, boxSize
+	if object:IsA("BasePart") then
+		boxCFrame = object.CFrame
+		boxSize = object.Size
+	elseif object:IsA("Model") then
+		boxCFrame, boxSize = object:GetBoundingBox()
+	else
+		return false
+	end
+
+	local objectSettings = settings.Objects
+	local maxDistance = objectSettings and objectSettings.MaxDistance or settings.MaxDistance
+	local distance = (boxCFrame.Position - origin).Magnitude
+	if distance > maxDistance then
+		return false
+	end
+
+	local state = entry.State
+	local screen = Camera.project(camera, boxCFrame.Position)
+	local boxOk = screen ~= nil and projectCorners(state.Box, boxCFrame, boxSize, camera, boxCFrame.Position)
+
+	state.Name = name
+	state.Player = nil
+	state.Character = object
+	state.Humanoid = nil
+	state.Root = object
+	state.Head = nil
+	state.Rig = "Object"
+	state.Distance = distance
+	state.Health = 0
+	state.MaxHealth = 0
+	state.Screen = boxOk and state.Box.Center or screen or Vector2.zero
+	state.TeamColor = objectSettings and objectSettings.Color or nil
+	state.BaseAlpha = distanceAlpha(settings, distance, maxDistance)
+	state.Alpha = state.BaseAlpha
+	state.Detail = true
+	state.ShowSkeleton = false
+	state.ShowChips = true
+	state.ShowTracer = false
+	state.BoneCount = 0
+	state.PointCount = 0
+
+	resolveScreen(state, camera, boxCFrame.Position, screen, boxOk)
+	resolveFacing(state, camera, boxCFrame, screen)
 	return true
 end
 

@@ -8,6 +8,7 @@
 	Copyright (c) 2026 Saint0-0
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 
@@ -73,6 +74,10 @@ local function buildDummy(entry, index)
 	local humanoid = model:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.DisplayName = string.format("Dummy %dm", entry.Distance)
+		-- A few dummies expose an armour pool so the secondary health bar is
+		-- visible when it is enabled in the panel.
+		humanoid:SetAttribute("Armor", 30 + (index % 4) * 20)
+		humanoid:SetAttribute("MaxArmor", 100)
 	end
 
 	return model
@@ -101,4 +106,32 @@ wall.Color = Color3.fromRGB(70, 74, 86)
 wall.Material = Enum.Material.Concrete
 wall.Parent = folder
 
-print(("[Phasma] %d dummies spawned at 10-500 studs."):format(#LAYOUT))
+-- Tagged loot models for object ESP. They are Models with a single neon part
+-- so the object bounding box is easy to see against the dummy boxes.
+local LOOT = {
+	{ Name = "Chest", Distance = 18, Angle = -34, Color = Color3.fromRGB(255, 196, 92) },
+	{ Name = "Ammo", Distance = 45, Angle = 26, Color = Color3.fromRGB(132, 226, 160) },
+	{ Name = "Medkit", Distance = 90, Angle = -24, Color = Color3.fromRGB(255, 128, 148) },
+	{ Name = "Relic", Distance = 220, Angle = 30, Color = Color3.fromRGB(186, 152, 255) },
+}
+
+for _, entry in ipairs(LOOT) do
+	local model = Instance.new("Model")
+	model.Name = entry.Name
+
+	local part = Instance.new("Part")
+	part.Name = entry.Name .. "Part"
+	part.Anchored = true
+	part.CanCollide = false
+	part.Size = Vector3.new(3, 2, 2)
+	part.Position = positionFor(entry.Distance, entry.Angle)
+	part.Color = entry.Color
+	part.Material = Enum.Material.Neon
+	part.Parent = model
+
+	model.PrimaryPart = part
+	model.Parent = folder
+	CollectionService:AddTag(model, "PhasmaLoot")
+end
+
+print(("[Phasma] %d dummies and %d loot models spawned at 10-500 studs."):format(#LAYOUT, #LOOT))

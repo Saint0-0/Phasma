@@ -23,7 +23,13 @@ function Tracer.New(ctx)
 end
 
 local function originFor(mode, viewport)
-	if mode == "Center" then
+	if mode == "Top" then
+		return Vector2.new(viewport.X * 0.5, 0)
+	elseif mode == "Left" then
+		return Vector2.new(0, viewport.Y * 0.5)
+	elseif mode == "Right" then
+		return Vector2.new(viewport.X, viewport.Y * 0.5)
+	elseif mode == "Center" then
 		return Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
 	elseif mode == "Mouse" then
 		return UserInputService:GetMouseLocation()
@@ -34,13 +40,22 @@ end
 function Tracer:Update(state)
 	local settings = self.Settings
 	local camera = workspace.CurrentCamera
-	if not settings.Enabled or not camera then
+	if not settings.Enabled or not state.ShowTracer or not camera then
 		self.Line.Visible = false
 		return
 	end
 
-	self.Line.From = originFor(settings.From, camera.ViewportSize)
-	self.Line.To = Vector2.new(state.Box.Center.X, state.Box.Position.Y + state.Box.Size.Y)
+	local progress = state.Anim and state.Anim.Tracer or 1
+	if progress <= 0.01 then
+		self.Line.Visible = false
+		return
+	end
+
+	local from = originFor(settings.From, camera.ViewportSize)
+	local target = Vector2.new(state.Box.Center.X, state.Box.Position.Y + state.Box.Size.Y)
+
+	self.Line.From = from
+	self.Line.To = from + (target - from) * progress
 	self.Line.Color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
 	self.Line.Thickness = settings.Thickness
 	self.Line.Transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, state.Alpha), state, self.Global)

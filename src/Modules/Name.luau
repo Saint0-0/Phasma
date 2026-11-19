@@ -61,15 +61,20 @@ function Name:Update(state)
 		self.MeasureTries = self.MeasureTries + 1
 	end
 
-	local center = Vector2.new(state.Box.Center.X, state.Box.Position.Y - settings.Offset - settings.TextSize * 0.5)
+	local center = Vector2.new(
+		state.Box.Center.X,
+		state.Box.Position.Y - settings.Offset - settings.TextSize * 0.5 - (state.Anim and state.Anim.SlideOffset or 0)
+	)
 
-	if settings.Background then
+	local alpha = state.Alpha
+	if settings.Background and state.ShowChips then
 		local padding = settings.Padding or 4
 		local size = Vector2.new(self.Bounds.X + padding * 2, self.Bounds.Y + padding * 2)
 		self.Chip.Position = center - size * 0.5
 		self.Chip.Size = size
 		self.Chip.Color = settings.BackgroundColor
-		self.Chip.Transparency = Alpha.apply(settings.BackgroundTransparency or 0.55, state.Alpha)
+		self.Chip.Transparency =
+			Occlusion.transparency(Alpha.apply(settings.BackgroundTransparency or 0.55, alpha), state, self.Global)
 		self.Chip.Filled = true
 		self.Chip.Visible = true
 	else
@@ -77,9 +82,10 @@ function Name:Update(state)
 	end
 
 	self.Text.Color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
-	self.Text.Transparency = Occlusion.transparency(settings.Transparency, state, self.Global)
+	self.Text.Transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, alpha), state, self.Global)
 	self.Text.Outline = settings.Outline
-	self.Text.OutlineTransparency = settings.OutlineTransparency or 0.45
+	self.Text.OutlineTransparency =
+		Occlusion.transparency(Alpha.apply(settings.OutlineTransparency or 0.45, alpha), state, self.Global)
 	self.Text.Position = center
 	self.Text.Visible = true
 end
