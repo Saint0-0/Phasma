@@ -43,6 +43,8 @@ local esp = Phasma:CreateESP({
 		Tags = { "PhasmaLoot" },
 		Classes = { "Model" },
 		Color = Color3.fromRGB(255, 206, 132),
+		-- Off-screen objects keep the edge arrow by default.
+		ShowArrow = true,
 	},
 
 	Box = {

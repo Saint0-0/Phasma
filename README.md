@@ -127,6 +127,7 @@ Object ESP:
 | `Objects.Classes` | `{ "Model" }` | `ClassName` allow-list; a match must satisfy one entry. |
 | `Objects.Tags` | `{}` | CollectionService tags to match. Tags take precedence over names. |
 | `Objects.Color` | muted grey | Box and name colour for objects. |
+| `Objects.ShowArrow` | `true` | Draws the edge arrow while an object is off screen. |
 
 Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`, `Direction`, `Arrow`.
 
@@ -171,7 +172,7 @@ With `Animations.Enabled` on, new targets fade in, the box settles from `Animati
 
 `LOD` is on by default at `600` studs. Beyond that distance the skeleton, chips and tracer are skipped unless their LOD key is set, and each far target rebuilds every `UpdateInterval` seconds instead of every frame; the animation step and element draw still run every frame.
 
-`Objects` draws tagged or named instances as boxes with a name and distance. Tags are read through `CollectionService`; names fall back to a workspace scan. A match is only kept when it also satisfies `Classes`, so enabling the feature with no tags and no names cannot box the whole map. Objects reuse the standard Box, Name, Distance and Arrow elements; Box and Name take `Objects.Color`, while the distance and arrow keep their own colours.
+`Objects` draws tagged or named instances as boxes with a name and distance. Tags are read through `CollectionService`; names fall back to a workspace scan. A match is only kept when it also satisfies `Classes`, so enabling the feature with no tags and no names cannot box the whole map. Objects reuse the standard Box, Name, Distance and Arrow elements; Box and Name take `Objects.Color`, while the distance and arrow keep their own colours. `Objects.ShowArrow = false` hides the edge arrow when an object leaves the viewport.
 
 `esp:ApplyPreset(name)` switches between `Default`, `Minimal`, `Clean`, `Sniper`, `Rage`, `Chams` and `Performance`. A preset only replaces the appearance blocks (`Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`, `Direction`, `Arrow` and `Animations`), so filters, LOD thresholds, object matching and security keep their current values. `esp:ListPresets()` returns the names in sorted order.
 

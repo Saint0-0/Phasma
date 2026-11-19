@@ -80,6 +80,8 @@ local Defaults = {
 		Classes = { "Model" },
 		Tags = {},
 		Color = Palette.Muted,
+		-- Draw the edge arrow while an object is off screen.
+		ShowArrow = true,
 	},
 
 	Box = {

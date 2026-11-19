@@ -173,6 +173,7 @@ function Target.newState()
 		ShowSkeleton = true,
 		ShowChips = true,
 		ShowTracer = true,
+		ShowArrow = true,
 		-- Injected by Entry so elements can read the transition progress.
 		Anim = nil,
 		-- Resolved once per frame; nil means "use the element colour".
@@ -331,10 +332,15 @@ local function projectNearBox(box, camera, position, size)
 
 	local distance = (position - camera.CFrame.Position).Magnitude
 	local viewport = camera.ViewportSize
+	if viewport.X <= 0 or viewport.Y <= 0 then
+		return false
+	end
 	local pixelsPerStud = (viewport.Y * 0.5) / math.tan(math.rad(camera.FieldOfView * 0.5))
 	local scale = pixelsPerStud / math.max(distance, 0.5)
-	local width = math.clamp(size.X * scale, 24, viewport.X * 1.5)
-	local height = math.clamp(size.Y * scale, 32, viewport.Y * 1.5)
+	-- `math.clamp` errors when the max is below the min, which happens while
+	-- the camera viewport is still settling. Keep the upper bound sane.
+	local width = math.clamp(size.X * scale, 24, math.max(viewport.X * 1.5, 24))
+	local height = math.clamp(size.Y * scale, 32, math.max(viewport.Y * 1.5, 32))
 	-- The root sits around mid-body, so lift the box a little.
 	local center = screen - Vector2.new(0, height * 0.12)
 
@@ -566,6 +572,9 @@ function Target.build(entry, name, player, camera, origin, settings)
 	state.Screen = headScreen or rootScreen or Vector2.zero
 	state.BaseAlpha = distanceAlpha(settings, distance)
 	state.Alpha = state.BaseAlpha
+	-- Humanoids always get the off-screen arrow; objects can opt out in
+	-- Target.buildObject through Objects.ShowArrow.
+	state.ShowArrow = true
 
 	-- A team colour overrides the element colours for the box, name, tracer,
 	-- skeleton and head dot. NPCs and teamless players keep the settings colour.
@@ -631,6 +640,7 @@ function Target.buildObject(entry, name, object, camera, origin, settings)
 	state.TeamColor = objectSettings and objectSettings.Color or nil
 	state.BaseAlpha = distanceAlpha(settings, distance, maxDistance)
 	state.Alpha = state.BaseAlpha
+	state.ShowArrow = objectSettings == nil or objectSettings.ShowArrow ~= false
 	state.Detail = true
 	state.ShowSkeleton = false
 	state.ShowChips = true

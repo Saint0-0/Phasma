@@ -33,7 +33,7 @@ end
 function Arrow:Update(state)
 	local settings = self.Settings
 	local camera = workspace.CurrentCamera
-	if not settings.Enabled or not state.Offscreen or not camera then
+	if not settings.Enabled or state.ShowArrow == false or not state.Offscreen or not camera then
 		self:Hide()
 		return
 	end
@@ -45,6 +45,15 @@ function Arrow:Update(state)
 	end
 
 	local viewport = camera.ViewportSize
+	local size = settings.Size or 9
+	local inset = (settings.Offset or 16) + size
+	-- A viewport smaller than the inset cannot host the chevron. Clamping with
+	-- max < min would throw while the camera is still settling after a join.
+	if viewport.X <= inset * 2 or viewport.Y <= inset * 2 then
+		self:Hide()
+		return
+	end
+
 	local direction = state.ArrowDirection
 	if direction.Magnitude < 0.001 then
 		direction = Vector2.new(0, 1)
@@ -52,8 +61,6 @@ function Arrow:Update(state)
 		direction = direction.Unit
 	end
 
-	local size = settings.Size or 9
-	local inset = (settings.Offset or 16) + size
 	local reach = viewport * 0.5 - Vector2.new(inset, inset)
 	reach = Vector2.new(math.max(reach.X, 1), math.max(reach.Y, 1))
 

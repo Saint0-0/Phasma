@@ -578,6 +578,11 @@ toggleRow(espPage, nextOrder(espPage), "Object ESP", function()
 end, function(value)
 	esp.Settings.Objects.Enabled = value
 end)
+toggleRow(espPage, nextOrder(espPage), "Object arrows", function()
+	return esp.Settings.Objects.ShowArrow
+end, function(value)
+	esp.Settings.Objects.ShowArrow = value
+end)
 sectionLabel(espPage, nextOrder(espPage), "OBJECT DISTANCE")
 segmentedRow(espPage, nextOrder(espPage), { 300, 600, 900, 1200 }, function()
 	return esp.Settings.Objects.MaxDistance
