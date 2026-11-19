@@ -1,0 +1,10 @@
+{
+  "name": "Phasma",
+  "tree": {
+    "$className": "Folder",
+    "Phasma": {
+      "$className": "Folder",
+      "Init": { "$path": "../dist/Phasma.luau" }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+--[[
+	Phasma/Core/Entry.luau
+
+	One player's set of elements. Rebuilt whenever the character changes, so
+	element objects never outlive the rig they were made for.
+	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
+	Copyright (c) 2026 Saint0-0
+]]
+
+local Highlight = require("../Modules/Highlight")
+local Tracer = require("../Modules/Tracer")
+local Skeleton = require("../Modules/Skeleton")
+local Box = require("../Modules/Box")
+local Health = require("../Modules/Health")
+local HeadDot = require("../Modules/HeadDot")
+local Name = require("../Modules/Name")
+local Distance = require("../Modules/Distance")
+
+local Entry = {}
+Entry.__index = Entry
+
+-- Order is also the z-order, back to front.
+local ORDER = {
+	{ Name = "Highlight", Module = Highlight },
+	{ Name = "Tracer", Module = Tracer },
+	{ Name = "Skeleton", Module = Skeleton },
+	{ Name = "Box", Module = Box },
+	{ Name = "Health", Module = Health },
+	{ Name = "HeadDot", Module = HeadDot },
+	{ Name = "Name", Module = Name },
+	{ Name = "Distance", Module = Distance },
+}
+
+function Entry.new(esp, owner, character)
+	local self = setmetatable({}, Entry)
+	self.Owner = owner
+	self.Character = character
+	self.Elements = {}
+
+	for index, entry in ipairs(ORDER) do
+		local settings = esp.Settings[entry.Name]
+		if settings then
+			self.Elements[#self.Elements + 1] = entry.Module.New({
+				Canvas = esp.Canvas,
+				Settings = settings,
+				Global = esp.Settings,
+				ZIndex = index,
+				Character = character,
+			})
+		end
+	end
+
+	return self
+end
+
+function Entry:Draw(state)
+	for _, element in ipairs(self.Elements) do
+		element:Update(state)
+	end
+end
+
+function Entry:Hide()
+	for _, element in ipairs(self.Elements) do
+		element:Hide()
+	end
+end
+
+function Entry:Destroy()
+	for _, element in ipairs(self.Elements) do
+		element:Destroy()
+	end
+	table.clear(self.Elements)
+end
+
+return Entry
