@@ -1,8 +1,9 @@
 --[[
 	Phasma/dev/PhasmaDebug.client.luau
 
-	Dev-only control panel for the test place. It owns the single ESP instance
-	and exposes every element toggle plus the distance cutoff.
+	Dev-only control panel for the test place. One draggable window with a tab
+	bar and a scrolling page per group: ESP, STYLE, ELEMENTS and COLOURS. It
+	owns the single ESP instance for the place.
 
 	Nothing under src/ requires this file, so it never reaches dist/Phasma.luau
 	or dist/Phasma.rbxm. It exists only inside the test place.
@@ -35,6 +36,7 @@ local COLORS = {
 
 local ELEMENTS = { "Box", "Name", "Distance", "Health", "Tracer", "Skeleton", "HeadDot", "Highlight" }
 local DISTANCES = { 250, 500, 1000, 2000 }
+local TABS = { "ESP", "STYLE", "ELEMENTS", "COLOURS" }
 
 -- Assigned once the library loads, so the row builders can close over it.
 local esp
@@ -167,6 +169,7 @@ local function distanceRow(parent, order)
 	end
 
 	refresh()
+	return holder
 end
 
 local function sectionLabel(parent, order, text)
@@ -184,7 +187,7 @@ local function sectionLabel(parent, order, text)
 end
 
 -- The shell is built before the library is touched. If Phasma is missing or
--- errors, the panel still appears and says so instead of failing silently.
+-- errors, the window still appears and says so instead of failing silently.
 local previous = playerGui:FindFirstChild("PhasmaDebug")
 if previous then
 	previous:Destroy()
@@ -204,7 +207,7 @@ gui.Parent = playerGui
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.Position = UDim2.fromOffset(16, 16)
-panel.Size = UDim2.fromOffset(248, 616)
+panel.Size = UDim2.fromOffset(300, 520)
 panel.BackgroundColor3 = COLORS.Panel
 panel.BorderSizePixel = 0
 panel.Active = true
@@ -224,28 +227,16 @@ padding.PaddingLeft = UDim.new(0, 8)
 padding.PaddingRight = UDim.new(0, 8)
 padding.Parent = panel
 
-local layout = Instance.new("UIListLayout")
-layout.Padding = UDim.new(0, 2)
-layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Parent = panel
-
-local order = 0
-local function nextOrder()
-	order = order + 1
-	return order
-end
-
 local title = Instance.new("Frame")
 title.Name = "Title"
-title.LayoutOrder = nextOrder()
 title.BackgroundTransparency = 1
 title.Active = true
-title.Size = UDim2.new(1, 0, 0, 22)
+title.Size = UDim2.new(1, 0, 0, 24)
 title.Parent = panel
 
 local titleLabel = Instance.new("TextLabel")
 titleLabel.BackgroundTransparency = 1
-titleLabel.Size = UDim2.new(1, -44, 1, 0)
+titleLabel.Size = UDim2.new(1, -60, 1, 0)
 titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 12
 titleLabel.TextColor3 = COLORS.Text
@@ -256,7 +247,7 @@ titleLabel.Parent = title
 local hint = Instance.new("TextLabel")
 hint.AnchorPoint = Vector2.new(1, 0.5)
 hint.Position = UDim2.fromScale(1, 0.5)
-hint.Size = UDim2.fromOffset(44, 22)
+hint.Size = UDim2.fromOffset(44, 24)
 hint.BackgroundTransparency = 1
 hint.Font = Enum.Font.GothamMedium
 hint.TextSize = 10
@@ -265,17 +256,105 @@ hint.TextXAlignment = Enum.TextXAlignment.Right
 hint.Text = "RAlt"
 hint.Parent = title
 
+local tabBar = Instance.new("Frame")
+tabBar.Name = "Tabs"
+tabBar.Position = UDim2.fromOffset(0, 30)
+tabBar.Size = UDim2.new(1, 0, 0, 26)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = panel
+
+local tabLayout = Instance.new("UIListLayout")
+tabLayout.FillDirection = Enum.FillDirection.Horizontal
+tabLayout.Padding = UDim.new(0, 4)
+tabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tabLayout.Parent = tabBar
+
+-- Pages are clipped to this frame; each page is a ScrollingFrame of its own.
+local content = Instance.new("Frame")
+content.Name = "Content"
+content.Position = UDim2.fromOffset(0, 62)
+content.Size = UDim2.new(1, 0, 1, -82)
+content.BackgroundTransparency = 1
+content.ClipsDescendants = true
+content.Parent = panel
+
 local status = Instance.new("TextLabel")
 status.Name = "Status"
-status.LayoutOrder = 99
-status.BackgroundTransparency = 1
+status.AnchorPoint = Vector2.new(0, 1)
+status.Position = UDim2.fromScale(0, 1)
 status.Size = UDim2.new(1, 0, 0, 16)
+status.BackgroundTransparency = 1
 status.Font = Enum.Font.GothamMedium
 status.TextSize = 10
 status.TextColor3 = COLORS.Muted
 status.TextXAlignment = Enum.TextXAlignment.Left
 status.Text = "loading library"
 status.Parent = panel
+
+local tabButtons = {}
+local pages = {}
+local orders = {}
+
+local function selectTab(name)
+	for key, page in pairs(pages) do
+		page.Visible = key == name
+	end
+	for key, button in pairs(tabButtons) do
+		local on = key == name
+		button.BackgroundColor3 = on and COLORS.Accent or COLORS.Row
+		button.TextColor3 = on and COLORS.KnobOn or COLORS.Text
+	end
+end
+
+for index, name in ipairs(TABS) do
+	local button = Instance.new("TextButton")
+	button.Name = name
+	button.LayoutOrder = index
+	button.Size = UDim2.new(0.25, -3, 1, 0)
+	button.BackgroundColor3 = COLORS.Row
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Font = Enum.Font.GothamMedium
+	button.TextSize = 10
+	button.TextColor3 = COLORS.Text
+	button.Text = name
+	button.Parent = tabBar
+	rounded(button, 4)
+	button.MouseButton1Click:Connect(function()
+		selectTab(name)
+	end)
+	tabButtons[name] = button
+end
+
+local function nextOrder(page)
+	orders[page] = (orders[page] or 0) + 1
+	return orders[page]
+end
+
+local function makePage(name)
+	local page = Instance.new("ScrollingFrame")
+	page.Name = name
+	page.Size = UDim2.fromScale(1, 1)
+	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
+	page.ClipsDescendants = true
+	page.ScrollBarThickness = 3
+	page.ScrollBarImageColor3 = COLORS.Stroke
+	page.ScrollBarImageTransparency = 0.2
+	page.ScrollingDirection = Enum.ScrollingDirection.Y
+	page.CanvasSize = UDim2.fromOffset(0, 0)
+	page.AutomaticCanvasSize = Enum.AutomaticSize.Y
+	page.Visible = false
+	page.Parent = content
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 2)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = page
+
+	pages[name] = page
+	return page
+end
 
 -- Library lookup is bounded and reported, so a missing bundle cannot hang the
 -- panel. rojo serve must be running and dist/Phasma.luau must exist.
@@ -326,82 +405,84 @@ end
 
 esp = result
 
-sectionLabel(panel, nextOrder(), "GLOBAL")
-toggleRow(panel, nextOrder(), "ESP", function()
+-- ESP ----------------------------------------------------------------------
+local espPage = makePage("ESP")
+sectionLabel(espPage, nextOrder(espPage), "GLOBAL")
+toggleRow(espPage, nextOrder(espPage), "ESP", function()
 	return esp.Settings.Enabled
 end, function(value)
 	esp:SetEnabled(value)
 end)
-toggleRow(panel, nextOrder(), "Visibility check", function()
+toggleRow(espPage, nextOrder(espPage), "Visibility check", function()
 	return esp.Settings.VisibilityCheck
 end, function(value)
 	esp.Settings.VisibilityCheck = value
 end)
-toggleRow(panel, nextOrder(), "Team check", function()
+toggleRow(espPage, nextOrder(espPage), "Team check", function()
 	return esp.Settings.TeamCheck
 end, function(value)
 	esp.Settings.TeamCheck = value
 end)
-toggleRow(panel, nextOrder(), "NPCs", function()
+toggleRow(espPage, nextOrder(espPage), "NPCs", function()
 	return esp.Settings.IncludeNPCs
 end, function(value)
 	esp.Settings.IncludeNPCs = value
 end)
+sectionLabel(espPage, nextOrder(espPage), "MAX DISTANCE")
+distanceRow(espPage, nextOrder(espPage))
 
-sectionLabel(panel, nextOrder(), "STYLE")
-toggleRow(panel, nextOrder(), "Team colours", function()
+-- STYLE --------------------------------------------------------------------
+local stylePage = makePage("STYLE")
+sectionLabel(stylePage, nextOrder(stylePage), "LOOK")
+toggleRow(stylePage, nextOrder(stylePage), "Team colours", function()
 	return esp.Settings.TeamColor
 end, function(value)
 	esp.Settings.TeamColor = value
 end)
-toggleRow(panel, nextOrder(), "Box glow", function()
+toggleRow(stylePage, nextOrder(stylePage), "Box glow", function()
 	return esp.Settings.Box.Glow
 end, function(value)
 	esp.Settings.Box.Glow = value
 end)
-toggleRow(panel, nextOrder(), "Health pulse", function()
+toggleRow(stylePage, nextOrder(stylePage), "Health pulse", function()
 	return esp.Settings.Health.Pulse
 end, function(value)
 	esp.Settings.Health.Pulse = value
 end)
-toggleRow(panel, nextOrder(), "Health %", function()
+toggleRow(stylePage, nextOrder(stylePage), "Health %", function()
 	return esp.Settings.Health.Percent
 end, function(value)
 	esp.Settings.Health.Percent = value
 	esp.Settings.Health.ShowText = value
 end)
-toggleRow(panel, nextOrder(), "Name chip", function()
+toggleRow(stylePage, nextOrder(stylePage), "Name chip", function()
 	return esp.Settings.Name.Background
 end, function(value)
 	esp.Settings.Name.Background = value
 end)
-toggleRow(panel, nextOrder(), "Distance chip", function()
+toggleRow(stylePage, nextOrder(stylePage), "Distance chip", function()
 	return esp.Settings.Distance.Background
 end, function(value)
 	esp.Settings.Distance.Background = value
 end)
-toggleRow(panel, nextOrder(), "Joint dots", function()
+toggleRow(stylePage, nextOrder(stylePage), "Joint dots", function()
 	return esp.Settings.Skeleton.Joints
 end, function(value)
 	esp.Settings.Skeleton.Joints = value
 end)
 
-sectionLabel(panel, nextOrder(), "ELEMENTS")
+-- ELEMENTS -----------------------------------------------------------------
+local elementsPage = makePage("ELEMENTS")
+sectionLabel(elementsPage, nextOrder(elementsPage), "ELEMENTS")
 for _, name in ipairs(ELEMENTS) do
-	toggleRow(panel, nextOrder(), name, function()
+	toggleRow(elementsPage, nextOrder(elementsPage), name, function()
 		return esp.Settings[name].Enabled
 	end, function(value)
 		esp.Settings[name].Enabled = value
 	end)
 end
 
-sectionLabel(panel, nextOrder(), "MAX DISTANCE")
-distanceRow(panel, nextOrder())
-
-status.Text = "ready"
-
--- A second panel keeps the main list short. Chips select an element and one
--- set of RGB sliders edits that element's colour in the live settings table.
+-- COLOURS ------------------------------------------------------------------
 local COLOUR_TARGETS = {
 	{ Name = "Box", Table = "Box", Key = "Color" },
 	{ Name = "Name", Table = "Name", Key = "Color" },
@@ -414,57 +495,14 @@ local COLOUR_TARGETS = {
 	{ Name = "HL outline", Table = "Highlight", Key = "Outline" },
 }
 
-local colours = Instance.new("Frame")
-colours.Name = "Colours"
-colours.Position = UDim2.fromOffset(276, 16)
-colours.Size = UDim2.fromOffset(268, 288)
-colours.BackgroundColor3 = COLORS.Panel
-colours.BorderSizePixel = 0
-colours.Active = true
-colours.Parent = gui
-rounded(colours, 8)
-
-local colourStroke = Instance.new("UIStroke")
-colourStroke.Color = COLORS.Stroke
-colourStroke.Thickness = 1
-colourStroke.Parent = colours
-
-local colourPadding = Instance.new("UIPadding")
-colourPadding.PaddingTop = UDim.new(0, 8)
-colourPadding.PaddingBottom = UDim.new(0, 8)
-colourPadding.PaddingLeft = UDim.new(0, 8)
-colourPadding.PaddingRight = UDim.new(0, 8)
-colourPadding.Parent = colours
-
-local colourLayout = Instance.new("UIListLayout")
-colourLayout.Padding = UDim.new(0, 2)
-colourLayout.SortOrder = Enum.SortOrder.LayoutOrder
-colourLayout.Parent = colours
-
-local colourOrder = 0
-local function nextColourOrder()
-	colourOrder = colourOrder + 1
-	return colourOrder
-end
-
-local colourTitle = Instance.new("TextLabel")
-colourTitle.Name = "Title"
-colourTitle.LayoutOrder = nextColourOrder()
-colourTitle.BackgroundTransparency = 1
-colourTitle.Active = true
-colourTitle.Size = UDim2.new(1, 0, 0, 20)
-colourTitle.Font = Enum.Font.GothamBold
-colourTitle.TextSize = 11
-colourTitle.TextColor3 = COLORS.Text
-colourTitle.TextXAlignment = Enum.TextXAlignment.Left
-colourTitle.Text = "COLOURS"
-colourTitle.Parent = colours
+local colourPage = makePage("COLOURS")
+sectionLabel(colourPage, nextOrder(colourPage), "TARGET")
 
 local chipHolder = Instance.new("Frame")
-chipHolder.LayoutOrder = nextColourOrder()
+chipHolder.LayoutOrder = nextOrder(colourPage)
 chipHolder.BackgroundTransparency = 1
 chipHolder.Size = UDim2.new(1, 0, 0, 126)
-chipHolder.Parent = colours
+chipHolder.Parent = colourPage
 
 local chipGrid = Instance.new("UIGridLayout")
 chipGrid.CellSize = UDim2.new(0.5, -3, 0, 22)
@@ -473,11 +511,11 @@ chipGrid.SortOrder = Enum.SortOrder.LayoutOrder
 chipGrid.Parent = chipHolder
 
 local preview = Instance.new("Frame")
-preview.LayoutOrder = nextColourOrder()
-preview.Size = UDim2.new(1, 0, 0, 28)
+preview.LayoutOrder = nextOrder(colourPage)
+preview.Size = UDim2.new(1, 0, 0, 30)
 preview.BackgroundColor3 = Color3.new(1, 1, 1)
 preview.BorderSizePixel = 0
-preview.Parent = colours
+preview.Parent = colourPage
 rounded(preview, 6)
 
 local previewStroke = Instance.new("UIStroke")
@@ -485,14 +523,30 @@ previewStroke.Color = COLORS.Stroke
 previewStroke.Thickness = 1
 previewStroke.Parent = preview
 
-local previewLabel = Instance.new("TextLabel")
-previewLabel.BackgroundTransparency = 1
-previewLabel.Size = UDim2.fromScale(1, 1)
-previewLabel.Font = Enum.Font.GothamBold
-previewLabel.TextSize = 11
-previewLabel.TextColor3 = COLORS.KnobOn
-previewLabel.Text = "#FFFFFF"
-previewLabel.Parent = preview
+local previewName = Instance.new("TextLabel")
+previewName.BackgroundTransparency = 1
+previewName.Position = UDim2.fromOffset(10, 0)
+previewName.Size = UDim2.new(0.5, -10, 1, 0)
+previewName.Font = Enum.Font.GothamMedium
+previewName.TextSize = 11
+previewName.TextColor3 = COLORS.KnobOn
+previewName.TextXAlignment = Enum.TextXAlignment.Left
+previewName.Text = "Box"
+previewName.Parent = preview
+
+local previewValue = Instance.new("TextLabel")
+previewValue.AnchorPoint = Vector2.new(1, 0)
+previewValue.Position = UDim2.fromScale(1, 0)
+previewValue.Size = UDim2.new(0.5, -10, 1, 0)
+previewValue.BackgroundTransparency = 1
+previewValue.Font = Enum.Font.GothamBold
+previewValue.TextSize = 11
+previewValue.TextColor3 = COLORS.KnobOn
+previewValue.TextXAlignment = Enum.TextXAlignment.Right
+previewValue.Text = "#FFFFFF"
+previewValue.Parent = preview
+
+sectionLabel(colourPage, nextOrder(colourPage), "CHANNELS")
 
 local CHANNELS = { "R", "G", "B" }
 local sliders = {}
@@ -511,14 +565,14 @@ end
 
 for index, channel in ipairs(CHANNELS) do
 	local row = Instance.new("Frame")
-	row.LayoutOrder = nextColourOrder()
+	row.LayoutOrder = nextOrder(colourPage)
 	row.BackgroundTransparency = 1
-	row.Size = UDim2.new(1, 0, 0, 22)
-	row.Parent = colours
+	row.Size = UDim2.new(1, 0, 0, 24)
+	row.Parent = colourPage
 
 	local name = Instance.new("TextLabel")
 	name.BackgroundTransparency = 1
-	name.Size = UDim2.fromOffset(14, 22)
+	name.Size = UDim2.fromOffset(14, 24)
 	name.Font = Enum.Font.GothamMedium
 	name.TextSize = 11
 	name.TextColor3 = COLORS.Muted
@@ -527,7 +581,7 @@ for index, channel in ipairs(CHANNELS) do
 
 	local track = Instance.new("TextButton")
 	track.Position = UDim2.fromOffset(18, 0)
-	track.Size = UDim2.new(1, -62, 1, 0)
+	track.Size = UDim2.new(1, -58, 1, 0)
 	track.BackgroundTransparency = 1
 	track.Text = ""
 	track.AutoButtonColor = false
@@ -563,7 +617,7 @@ for index, channel in ipairs(CHANNELS) do
 	local value = Instance.new("TextLabel")
 	value.AnchorPoint = Vector2.new(1, 0.5)
 	value.Position = UDim2.fromScale(1, 0.5)
-	value.Size = UDim2.fromOffset(36, 22)
+	value.Size = UDim2.fromOffset(34, 24)
 	value.BackgroundTransparency = 1
 	value.Font = Enum.Font.GothamMedium
 	value.TextSize = 10
@@ -637,9 +691,12 @@ refreshColour = function()
 	local r = math.floor(color.R * 255 + 0.5)
 	local g = math.floor(color.G * 255 + 0.5)
 	local b = math.floor(color.B * 255 + 0.5)
-	previewLabel.Text = string.format("#%02X%02X%02X", r, g, b)
+	previewName.Text = spec.Name
+	previewValue.Text = string.format("#%02X%02X%02X", r, g, b)
 	local luma = 0.299 * color.R + 0.587 * color.G + 0.114 * color.B
-	previewLabel.TextColor3 = luma > 0.55 and COLORS.KnobOn or COLORS.Text
+	local foreground = luma > 0.55 and COLORS.KnobOn or COLORS.Text
+	previewName.TextColor3 = foreground
+	previewValue.TextColor3 = foreground
 	for _, slider in ipairs(sliders) do
 		slider.Refresh()
 	end
@@ -677,37 +734,8 @@ for index, spec in ipairs(COLOUR_TARGETS) do
 end
 
 selectChip(1)
-
--- The colour panel gets its own drag handle.
-local colourDragging = false
-local colourStart = nil
-local colourOrigin = nil
-
-colourTitle.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		colourDragging = true
-		colourStart = input.Position
-		colourOrigin = colours.Position
-	end
-end)
-
-UserInputService.InputChanged:Connect(function(input)
-	if colourDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-		local delta = input.Position - colourStart
-		colours.Position = UDim2.new(
-			colourOrigin.X.Scale,
-			colourOrigin.X.Offset + delta.X,
-			colourOrigin.Y.Scale,
-			colourOrigin.Y.Offset + delta.Y
-		)
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		colourDragging = false
-	end
-end)
+selectTab("ESP")
+status.Text = "ready"
 
 -- The entry map is internal; a dev panel may read it for a live count.
 local elapsed = 0

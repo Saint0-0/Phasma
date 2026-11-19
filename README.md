@@ -150,10 +150,10 @@ The render path is built to stay flat as the target count grows:
 - A baseplate and a spawn at the origin.
 - Eight R15 dummies at 10, 25, 50, 100, 200, 350 and 500 studs, plus one behind spawn, each with a different health value.
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
-- A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players.
-- A second **COLOURS** panel beside it: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline and the health bar background are included.
+- A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players. It is one window with `ESP`, `STYLE`, `ELEMENTS` and `COLOURS` tabs; each tab scrolls independently, so the panel stays a fixed size.
+- The `COLOURS` tab: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline and the health bar background are included.
 
-Controls: **RightAlt** hides or shows the panel, and every row in it toggles the matching setting on the next frame. The panel footer shows the active backend, the target count and the live engine count.
+Controls: **RightAlt** hides or shows the window, the title bar drags it, and the tab bar switches pages. Every row toggles the matching setting on the next frame. The footer shows the active backend, the target count and the live engine count.
 
 The panel is dev-only: nothing under `src/` requires it, so it is absent from `dist/Phasma.luau` and `dist/Phasma.rbxm`. `example/Phasma_Test.client.luau` is the standalone demo for releases and is no longer mapped into the place, since two ESP instances would draw everything twice.
 
