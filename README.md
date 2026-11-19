@@ -110,7 +110,15 @@ Controls: **RightAlt** hides or shows the panel, and every row in it toggles the
 
 The panel is dev-only: nothing under `src/` requires it, so it is absent from `dist/Phasma.luau` and `dist/Phasma.rbxm`. `example/Phasma_Test.client.luau` is the standalone demo for releases and is no longer mapped into the place, since two ESP instances would draw everything twice.
 
-Rebuild the place with:
+The panel builds its own ScreenGui before it touches the library, so it is visible even when `ReplicatedStorage.Phasma.Init` is missing; in that case it says `library missing - see Output` and prints the reason.
+
+The place is served, not rebuilt:
+
+```powershell
+powershell -File dev.ps1
+```
+
+`dev.ps1` runs darklua in watch mode (for `dist/Phasma.luau`) and `rojo serve` side by side. Connect the Rojo plugin, then stop and press Play so `StarterPlayerScripts` is cloned with the current scripts. Only build `Phasma.rbxl` when a self-contained place file is needed:
 
 ```powershell
 tools\rojo.exe build default.project.json -o Phasma.rbxl
@@ -135,7 +143,14 @@ tools\darklua.exe process src/Init.luau dist/Phasma.luau -c build/darklua.json -
 tools\rojo.exe serve default.project.json
 ```
 
-The place reads `dist/Phasma.luau`, so the bundle has to exist before `rojo serve` or `rojo build`. That is deliberate: the source uses darklua path requires (`require("./Core/ESP")`), which Roblox cannot resolve on its own, and the bundle is what both the place and the release ship.
+`dev.ps1` starts both halves of that loop in one command: darklua in watch mode and `rojo serve`. The place is never rebuilt during development; Rojo owns every script in it.
+
+Two things to know about the live loop:
+
+- `StarterPlayerScripts` is cloned into `PlayerScripts` when a play session starts. Scripts synced through Rojo only appear after you stop and press Play again.
+- The place reads `dist/Phasma.luau`, so darklua must be watching (or the bundle must be rebuilt) before a library change reaches the client. The dev panel and the dummy spawner are served straight from `dev/`, so they update on the next play with no bundle step.
+
+That split is deliberate: the source uses darklua path requires (`require("./Core/ESP")`), which Roblox cannot resolve on its own, and the bundle is what both the place and the release ship.
 
 ## Structure
 

@@ -16,7 +16,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
-local Phasma = require(ReplicatedStorage:WaitForChild("Phasma"):WaitForChild("Init"))
+print("[Phasma] debug script started")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
 
 local COLORS = {
 	Panel = Color3.fromRGB(18, 20, 26),
@@ -33,20 +36,8 @@ local COLORS = {
 local ELEMENTS = { "Box", "Name", "Distance", "Health", "Tracer", "Skeleton", "HeadDot", "Highlight" }
 local DISTANCES = { 250, 500, 1000, 2000 }
 
-local esp = Phasma:CreateESP({
-	MaxDistance = 1200,
-	IncludeNPCs = true, -- the dummies are humanoid models, not players
-	Box = { Enabled = true, Color = Color3.fromRGB(170, 205, 255) },
-	Name = { Enabled = true },
-	Distance = { Enabled = true },
-	Health = { Enabled = true },
-	Tracer = { Enabled = true, From = "Bottom" },
-	Skeleton = { Enabled = true },
-	HeadDot = { Enabled = true },
-	Highlight = { Enabled = true, FillTransparency = 0.75, OutlineTransparency = 0.1 },
-})
-
-local refreshers = {}
+-- Assigned once the library loads, so the row builders can close over it.
+local esp
 
 local function rounded(instance, radius)
 	local corner = Instance.new("UICorner")
@@ -104,12 +95,9 @@ local function toggleRow(parent, order, label, get, set)
 
 	row.MouseButton1Click:Connect(function()
 		set(not get())
-		for _, refreshRow in ipairs(refreshers) do
-			refreshRow()
-		end
+		refresh()
 	end)
 
-	refreshers[#refreshers + 1] = refresh
 	refresh()
 	return row
 end
@@ -155,15 +143,12 @@ local function distanceRow(parent, order)
 
 		button.MouseButton1Click:Connect(function()
 			esp:SetMaxDistance(value)
-			for _, refreshRow in ipairs(refreshers) do
-				refreshRow()
-			end
+			refresh()
 		end)
 
 		buttons[value] = button
 	end
 
-	refreshers[#refreshers + 1] = refresh
 	refresh()
 end
 
@@ -181,25 +166,32 @@ local function sectionLabel(parent, order, text)
 	return label
 end
 
-local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+-- The shell is built before the library is touched. If Phasma is missing or
+-- errors, the panel still appears and says so instead of failing silently.
+local previous = playerGui:FindFirstChild("PhasmaDebug")
+if previous then
+	previous:Destroy()
+end
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "PhasmaDebug"
--- Keep the panel below the top bar; it is UI, not part of the overlay.
+-- Inset-aware: the panel is UI, so it sits inside the safe area, below the
+-- top bar, instead of being drawn under it.
 gui.IgnoreGuiInset = false
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 1000000
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Enabled = true
 gui.Parent = playerGui
 
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
 panel.Position = UDim2.fromOffset(16, 16)
--- Fixed height: AutomaticSize on a frame with a list layout can resolve to 0
--- for a frame, which makes the whole panel invisible.
-panel.Size = UDim2.fromOffset(248, 450)
+panel.Size = UDim2.fromOffset(248, 464)
 panel.BackgroundColor3 = COLORS.Panel
 panel.BorderSizePixel = 0
+panel.Active = true
+panel.Visible = true
 panel.Parent = gui
 rounded(panel, 8)
 
@@ -230,6 +222,7 @@ local title = Instance.new("Frame")
 title.Name = "Title"
 title.LayoutOrder = nextOrder()
 title.BackgroundTransparency = 1
+title.Active = true
 title.Size = UDim2.new(1, 0, 0, 24)
 title.Parent = panel
 
@@ -240,7 +233,7 @@ titleLabel.Font = Enum.Font.GothamBold
 titleLabel.TextSize = 12
 titleLabel.TextColor3 = COLORS.Text
 titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.Text = "PHASMA  v" .. Phasma.Version
+titleLabel.Text = "PHASMA"
 titleLabel.Parent = title
 
 local hint = Instance.new("TextLabel")
@@ -254,6 +247,60 @@ hint.TextColor3 = COLORS.Muted
 hint.TextXAlignment = Enum.TextXAlignment.Right
 hint.Text = "RAlt"
 hint.Parent = title
+
+local status = Instance.new("TextLabel")
+status.Name = "Status"
+status.LayoutOrder = 99
+status.BackgroundTransparency = 1
+status.Size = UDim2.new(1, 0, 0, 16)
+status.Font = Enum.Font.GothamMedium
+status.TextSize = 10
+status.TextColor3 = COLORS.Muted
+status.TextXAlignment = Enum.TextXAlignment.Left
+status.Text = "loading library"
+status.Parent = panel
+
+-- Library lookup is bounded and reported, so a missing bundle cannot hang the
+-- panel. rojo serve must be running and dist/Phasma.luau must exist.
+local folder = ReplicatedStorage:WaitForChild("Phasma", 10)
+local init = folder and folder:WaitForChild("Init", 10)
+local loaded, Phasma = pcall(function()
+	if not init then
+		error("ReplicatedStorage.Phasma.Init was not found (is rojo serving dist/Phasma.luau?)")
+	end
+	return require(init)
+end)
+
+if not loaded then
+	status.Text = "library missing - see Output"
+	warn("[Phasma] debug panel: " .. tostring(Phasma))
+	return
+end
+
+titleLabel.Text = "PHASMA  v" .. Phasma.Version
+
+local created, result = pcall(function()
+	return Phasma:CreateESP({
+		MaxDistance = 1200,
+		IncludeNPCs = true, -- the dummies are humanoid models, not players
+		Box = { Enabled = true, Color = Color3.fromRGB(170, 205, 255) },
+		Name = { Enabled = true },
+		Distance = { Enabled = true },
+		Health = { Enabled = true },
+		Tracer = { Enabled = true, From = "Bottom" },
+		Skeleton = { Enabled = true },
+		HeadDot = { Enabled = true },
+		Highlight = { Enabled = true, FillTransparency = 0.75, OutlineTransparency = 0.1 },
+	})
+end)
+
+if not created then
+	status.Text = "CreateESP failed - see Output"
+	warn("[Phasma] debug panel: " .. tostring(result))
+	return
+end
+
+esp = result
 
 sectionLabel(panel, nextOrder(), "GLOBAL")
 toggleRow(panel, nextOrder(), "ESP", function()
@@ -289,36 +336,13 @@ end
 sectionLabel(panel, nextOrder(), "MAX DISTANCE")
 distanceRow(panel, nextOrder())
 
-local status = Instance.new("TextLabel")
-status.Name = "Status"
-status.LayoutOrder = nextOrder()
-status.BackgroundTransparency = 1
-status.Size = UDim2.new(1, 0, 0, 16)
-status.Font = Enum.Font.GothamMedium
-status.TextSize = 10
-status.TextColor3 = COLORS.Muted
-status.TextXAlignment = Enum.TextXAlignment.Left
-status.Text = "starting"
-status.Parent = panel
-
--- One-time check: a panel with a real size is proof the overlay is on screen.
-task.delay(0.2, function()
-	print(
-		string.format(
-			"[Phasma] panel %.0fx%.0f at (%.0f, %.0f)",
-			panel.AbsoluteSize.X,
-			panel.AbsoluteSize.Y,
-			panel.AbsolutePosition.X,
-			panel.AbsolutePosition.Y
-		)
-	)
-end)
+status.Text = "ready"
 
 -- The entry map is internal; a dev panel may read it for a live count.
 local elapsed = 0
 RunService.Heartbeat:Connect(function(delta)
 	elapsed = elapsed + delta
-	if elapsed < 0.25 then
+	if elapsed < 0.25 or not esp then
 		return
 	end
 	elapsed = 0
@@ -369,4 +393,18 @@ UserInputService.InputBegan:Connect(function(input, processed)
 	end
 end)
 
-print(string.format("[Phasma] debug panel ready on the %s backend.", esp.Canvas.Kind))
+-- One line that proves where the panel ended up, whatever the layout did.
+task.delay(0.5, function()
+	print(
+		string.format(
+			"[Phasma] panel visible=%s %.0fx%.0f at (%.0f, %.0f) gui=%s parent=%s",
+			tostring(panel.Visible),
+			panel.AbsoluteSize.X,
+			panel.AbsoluteSize.Y,
+			panel.AbsolutePosition.X,
+			panel.AbsolutePosition.Y,
+			tostring(gui.Enabled),
+			gui.Parent and gui.Parent:GetFullName() or "nil"
+		)
+	)
+end)

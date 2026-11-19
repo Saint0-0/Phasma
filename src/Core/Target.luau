@@ -35,10 +35,10 @@ local R15_JOINTS = {
 local R15_SEGMENTS = {
 	{ "Neck", "Waist" },
 	{ "Neck", "HeadTop" },
-	{ "Waist", "LeftShoulder" },
+	{ "Neck", "LeftShoulder" },
 	{ "LeftShoulder", "LeftElbow" },
 	{ "LeftElbow", "LeftWrist" },
-	{ "Waist", "RightShoulder" },
+	{ "Neck", "RightShoulder" },
 	{ "RightShoulder", "RightElbow" },
 	{ "RightElbow", "RightWrist" },
 	{ "Waist", "LeftHip" },
@@ -71,6 +71,33 @@ local R6_SEGMENTS = {
 	{ "RootJoint", "Right Hip" },
 	{ "Left Hip", "LeftFoot" },
 	{ "Right Hip", "RightFoot" },
+}
+
+-- Fallback for rigs whose joints are missing or named differently: part
+-- centres still produce a usable stick figure.
+local R15_PART_SEGMENTS = {
+	{ "Head", "UpperTorso" },
+	{ "UpperTorso", "LowerTorso" },
+	{ "UpperTorso", "LeftUpperArm" },
+	{ "LeftUpperArm", "LeftLowerArm" },
+	{ "LeftLowerArm", "LeftHand" },
+	{ "UpperTorso", "RightUpperArm" },
+	{ "RightUpperArm", "RightLowerArm" },
+	{ "RightLowerArm", "RightHand" },
+	{ "LowerTorso", "LeftUpperLeg" },
+	{ "LeftUpperLeg", "LeftLowerLeg" },
+	{ "LeftLowerLeg", "LeftFoot" },
+	{ "LowerTorso", "RightUpperLeg" },
+	{ "RightUpperLeg", "RightLowerLeg" },
+	{ "RightLowerLeg", "RightFoot" },
+}
+
+local R6_PART_SEGMENTS = {
+	{ "Head", "Torso" },
+	{ "Torso", "Left Arm" },
+	{ "Torso", "Right Arm" },
+	{ "Torso", "Left Leg" },
+	{ "Torso", "Right Leg" },
 }
 
 -- Joint instances never change for the lifetime of a character, so the
@@ -117,6 +144,30 @@ local function projectPartPoint(camera, character, partName, offsetY)
 	return Camera.project(camera, world)
 end
 
+local function collectPartBones(character, camera, pairs)
+	local points = {}
+	for _, pair in ipairs(pairs) do
+		for _, name in ipairs(pair) do
+			if not points[name] then
+				local part = character:FindFirstChild(name)
+				if part and part:IsA("BasePart") then
+					points[name] = Camera.project(camera, part.Position)
+				end
+			end
+		end
+	end
+
+	local bones = {}
+	for _, pair in ipairs(pairs) do
+		local from = points[pair[1]]
+		local to = points[pair[2]]
+		if from and to then
+			bones[#bones + 1] = { From = from, To = to }
+		end
+	end
+	return bones
+end
+
 local function collectBones(character, camera, rig)
 	local points = {}
 
@@ -144,6 +195,12 @@ local function collectBones(character, camera, rig)
 			bones[#bones + 1] = { From = from, To = to }
 		end
 	end
+
+	if #bones == 0 then
+		local fallback = rig == "R15" and R15_PART_SEGMENTS or R6_PART_SEGMENTS
+		bones = collectPartBones(character, camera, fallback)
+	end
+
 	return bones
 end
 
