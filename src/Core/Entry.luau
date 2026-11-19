@@ -18,6 +18,7 @@ local Health = require("../Modules/Health")
 local HeadDot = require("../Modules/HeadDot")
 local Name = require("../Modules/Name")
 local Distance = require("../Modules/Distance")
+local Arrow = require("../Modules/Arrow")
 
 local Entry = {}
 Entry.__index = Entry
@@ -32,6 +33,7 @@ local ORDER = {
 	{ Name = "HeadDot", Module = HeadDot },
 	{ Name = "Name", Module = Name },
 	{ Name = "Distance", Module = Distance },
+	{ Name = "Arrow", Module = Arrow },
 }
 
 function Entry.new(esp, owner, character)
@@ -76,7 +78,13 @@ end
 
 function Entry:Draw(state)
 	for _, element in ipairs(self.Elements) do
-		element:Update(state)
+		-- The arrow is the only element that draws while the target is off
+		-- screen; everything else would be using a stale box.
+		if state.Offscreen and not element.OffscreenOnly then
+			element:Hide()
+		else
+			element:Update(state)
+		end
 	end
 end
 

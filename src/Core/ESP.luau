@@ -9,7 +9,7 @@
 	  * entries own their frame state, so rendering allocates no tables
 	  * NPCs are tracked by events with a slow safety rescan
 	  * visibility raycasts are throttled per target
-	  * anything behind the camera is rejected with one projection
+	  * off-screen targets skip raycasts and projection beyond the arrow
 
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
@@ -161,6 +161,15 @@ function ESP:_draw(owner, character, player, camera, origin, settings, localChar
 	end
 
 	local state = entry.State
+	-- Off-screen targets draw only the arrow; raycasting them is wasted work.
+	if state.Offscreen then
+		state.Visible = true
+		state.Occluded = false
+		entry:Draw(state)
+		return
+	end
+
+	state.Occluded = false
 	if settings.VisibilityCheck then
 		local now = os.clock()
 		local interval = settings.VisibilityInterval or 0.12
@@ -169,12 +178,13 @@ function ESP:_draw(owner, character, player, camera, origin, settings, localChar
 			entry.VisibleAt = now
 		end
 		state.Visible = entry.Visible
+		state.Occluded = not entry.Visible
 	else
 		entry.Visible = true
 		state.Visible = true
 	end
 
-	if state.Visible then
+	if state.Visible or settings.ShowOccluded then
 		entry:Draw(state)
 	else
 		entry:Hide()

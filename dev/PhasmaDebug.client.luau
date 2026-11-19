@@ -34,7 +34,7 @@ local COLORS = {
 	KnobOff = Color3.fromRGB(150, 158, 172),
 }
 
-local ELEMENTS = { "Box", "Name", "Distance", "Health", "Tracer", "Skeleton", "HeadDot", "Highlight" }
+local ELEMENTS = { "Box", "Name", "Distance", "Health", "Tracer", "Skeleton", "HeadDot", "Highlight", "Arrow" }
 local DISTANCES = { 250, 500, 1000, 2000 }
 local TABS = { "ESP", "STYLE", "ELEMENTS", "COLOURS" }
 
@@ -428,6 +428,11 @@ toggleRow(espPage, nextOrder(espPage), "NPCs", function()
 end, function(value)
 	esp.Settings.IncludeNPCs = value
 end)
+toggleRow(espPage, nextOrder(espPage), "Occluded", function()
+	return esp.Settings.ShowOccluded
+end, function(value)
+	esp.Settings.ShowOccluded = value
+end)
 sectionLabel(espPage, nextOrder(espPage), "MAX DISTANCE")
 distanceRow(espPage, nextOrder(espPage))
 
@@ -493,6 +498,7 @@ local COLOUR_TARGETS = {
 	{ Name = "Health bg", Table = "Health", Key = "Background" },
 	{ Name = "HL fill", Table = "Highlight", Key = "Fill" },
 	{ Name = "HL outline", Table = "Highlight", Key = "Outline" },
+	{ Name = "Arrow", Table = "Arrow", Key = "Color" },
 }
 
 local colourPage = makePage("COLOURS")

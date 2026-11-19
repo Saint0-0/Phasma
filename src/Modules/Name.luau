@@ -10,6 +10,7 @@
 
 local Constants = require("../Constants")
 local Alpha = require("../Utils/Alpha")
+local Occlusion = require("../Utils/Occlusion")
 
 local Name = {}
 Name.__index = Name
@@ -17,6 +18,7 @@ Name.__index = Name
 function Name.New(ctx)
 	local self = setmetatable({}, Name)
 	self.Settings = ctx.Settings
+	self.Global = ctx.Global
 	-- The chip is created first so it renders behind the text.
 	self.Chip = ctx.Canvas:Rect(ctx.ZIndex)
 	self.Text = ctx.Canvas:Text(ctx.ZIndex)
@@ -74,8 +76,8 @@ function Name:Update(state)
 		self.Chip.Visible = false
 	end
 
-	self.Text.Color = state.TeamColor or settings.Color
-	self.Text.Transparency = settings.Transparency
+	self.Text.Color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
+	self.Text.Transparency = Occlusion.transparency(settings.Transparency, state, self.Global)
 	self.Text.Outline = settings.Outline
 	self.Text.OutlineTransparency = settings.OutlineTransparency or 0.45
 	self.Text.Position = center

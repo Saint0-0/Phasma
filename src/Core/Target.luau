@@ -105,6 +105,28 @@ local R6_PART_SEGMENTS = {
 	{ "Torso", "Right Leg" },
 }
 
+-- The engine bounding box includes hats and accessories, which can double the
+-- height of the box. These lists are the rig itself.
+local R15_BODY = {
+	"Head",
+	"UpperTorso",
+	"LowerTorso",
+	"LeftUpperArm",
+	"LeftLowerArm",
+	"LeftHand",
+	"RightUpperArm",
+	"RightLowerArm",
+	"RightHand",
+	"LeftUpperLeg",
+	"LeftLowerLeg",
+	"LeftFoot",
+	"RightUpperLeg",
+	"RightLowerLeg",
+	"RightFoot",
+}
+
+local R6_BODY = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" }
+
 -- Joint instances never change for the lifetime of a character, so the
 -- recursive lookups happen once. Weak keys let dead characters drop out.
 local jointCache = setmetatable({}, { __mode = "k" })
@@ -139,6 +161,9 @@ function Target.newState()
 		Alpha = 1,
 		Delta = 0,
 		Visible = true,
+		Occluded = false,
+		Offscreen = false,
+		ArrowDirection = Vector2.zero,
 		-- Resolved once per frame; nil means "use the element colour".
 		TeamColor = nil,
 	}
@@ -284,10 +309,78 @@ local function collectBones(state, character, camera, rig)
 	return count, pointCount
 end
 
--- Projects the eight corners of the character's oriented box into `box`.
-local function projectBox(box, character, camera)
-	local boxCFrame, boxSize = character:GetBoundingBox()
-	local half = boxSize * 0.5
+-- When the camera is inside the rig, a corner sits behind the near plane and
+-- its projection flips. Fall back to a distance-scaled screen box centred on
+-- the root so the box shrinks from huge to normal instead of vanishing.
+local function projectNearBox(box, camera, root, size)
+	local screen = Camera.project(camera, root.Position)
+	if not screen then
+		return false
+	end
+
+	local distance = (root.Position - camera.CFrame.Position).Magnitude
+	local viewport = camera.ViewportSize
+	local pixelsPerStud = (viewport.Y * 0.5) / math.tan(math.rad(camera.FieldOfView * 0.5))
+	local scale = pixelsPerStud / math.max(distance, 0.5)
+	local width = math.clamp(size.X * scale, 24, viewport.X * 1.5)
+	local height = math.clamp(size.Y * scale, 32, viewport.Y * 1.5)
+	-- The root sits around mid-body, so lift the box a little.
+	local center = screen - Vector2.new(0, height * 0.12)
+
+	box.Position = center - Vector2.new(width * 0.5, height * 0.5)
+	box.Size = Vector2.new(width, height)
+	box.Center = center
+	return true
+end
+
+-- Projects the eight corners of the rig's body box into `box`. The box is
+-- built in root space from the body parts only, so hats and accessories do
+-- not widen it.
+local function projectBox(box, entry, camera)
+	local character = entry.Character
+	local root = entry.Root
+	local names = entry.Rig == "R15" and R15_BODY or R6_BODY
+	local inverse = root.CFrame:Inverse()
+
+	local min, max
+	for _, name in ipairs(names) do
+		local part = partFor(character, name)
+		if part then
+			local half = part.Size * 0.5
+			local cf = inverse * part.CFrame
+			local rx, ry, rz = cf.RightVector, cf.UpVector, cf.LookVector
+			local extent = Vector3.new(
+				math.abs(rx.X) * half.X + math.abs(ry.X) * half.Y + math.abs(rz.X) * half.Z,
+				math.abs(rx.Y) * half.X + math.abs(ry.Y) * half.Y + math.abs(rz.Y) * half.Z,
+				math.abs(rx.Z) * half.X + math.abs(ry.Z) * half.Y + math.abs(rz.Z) * half.Z
+			)
+			local center = cf.Position
+			if min then
+				min = Vector3.new(
+					math.min(min.X, center.X - extent.X),
+					math.min(min.Y, center.Y - extent.Y),
+					math.min(min.Z, center.Z - extent.Z)
+				)
+				max = Vector3.new(
+					math.max(max.X, center.X + extent.X),
+					math.max(max.Y, center.Y + extent.Y),
+					math.max(max.Z, center.Z + extent.Z)
+				)
+			else
+				min = center - extent
+				max = center + extent
+			end
+		end
+	end
+
+	if not min then
+		return false
+	end
+
+	local center = (min + max) * 0.5
+	local size = max - min
+	local boxCFrame = root.CFrame * CFrame.new(center)
+	local half = size * 0.5
 
 	local minX, minY, maxX, maxY
 	for xi = 0, 1 do
@@ -296,10 +389,9 @@ local function projectBox(box, character, camera)
 			local y = yi == 0 and -half.Y or half.Y
 			for zi = 0, 1 do
 				local z = zi == 0 and -half.Z or half.Z
-				local corner = boxCFrame * Vector3.new(x, y, z)
-				local screen = Camera.project(camera, corner)
+				local screen = Camera.project(camera, boxCFrame * Vector3.new(x, y, z))
 				if not screen then
-					return false
+					return projectNearBox(box, camera, root, size)
 				end
 				minX = minX and math.min(minX, screen.X) or screen.X
 				maxX = maxX and math.max(maxX, screen.X) or screen.X
@@ -337,21 +429,14 @@ function Target.build(entry, name, player, camera, origin, settings)
 		return false
 	end
 
-	-- One projection is enough to reject anything behind the camera before
-	-- the bounding box does eight of them.
-	if not Camera.project(camera, root.Position) then
-		return false
-	end
-
 	local distance = (root.Position - origin).Magnitude
 	if distance > settings.MaxDistance then
 		return false
 	end
 
 	local state = entry.State
-	if not projectBox(state.Box, character, camera) then
-		return false
-	end
+	local rootScreen = Camera.project(camera, root.Position)
+	local boxOk = rootScreen ~= nil and projectBox(state.Box, entry, camera)
 
 	local headScreen = Camera.project(camera, head.Position)
 
@@ -365,7 +450,7 @@ function Target.build(entry, name, player, camera, origin, settings)
 	state.Distance = distance
 	state.Health = humanoid.Health
 	state.MaxHealth = humanoid.MaxHealth
-	state.Screen = headScreen or state.Box.Center
+	state.Screen = headScreen or rootScreen or Vector2.zero
 
 	-- A team colour overrides the element colours for the box, name, tracer,
 	-- skeleton and head dot. NPCs and teamless players keep the settings colour.
@@ -375,7 +460,44 @@ function Target.build(entry, name, player, camera, origin, settings)
 		state.TeamColor = nil
 	end
 
-	if settings.Skeleton and settings.Skeleton.Enabled then
+	-- Off-screen targets keep a direction instead of a box, which the arrow
+	-- element turns into a chevron on the viewport edge.
+	local viewport = camera.ViewportSize
+	local centre = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+	local onScreen
+	if boxOk then
+		local box = state.Box
+		onScreen = box.Position.X <= viewport.X
+			and box.Position.X + box.Size.X >= 0
+			and box.Position.Y <= viewport.Y
+			and box.Position.Y + box.Size.Y >= 0
+	elseif rootScreen then
+		onScreen = rootScreen.X >= 0 and rootScreen.X <= viewport.X and rootScreen.Y >= 0 and rootScreen.Y <= viewport.Y
+	else
+		onScreen = false
+	end
+
+	state.Offscreen = not onScreen
+	if state.Offscreen then
+		if rootScreen then
+			local delta = rootScreen - centre
+			if delta.Magnitude < 1 then
+				state.ArrowDirection = Vector2.new(0, 1)
+			else
+				state.ArrowDirection = delta.Unit
+			end
+		else
+			-- Behind the camera: bias the arrow to the side that needs turning.
+			local localPos = camera.CFrame:PointToObjectSpace(root.Position)
+			if math.abs(localPos.X) < 0.5 then
+				state.ArrowDirection = Vector2.new(0, 1)
+			else
+				state.ArrowDirection = Vector2.new(localPos.X * 0.35, 1).Unit
+			end
+		end
+	end
+
+	if onScreen and settings.Skeleton and settings.Skeleton.Enabled then
 		state.BoneCount, state.PointCount = collectBones(state, character, camera, entry.Rig)
 	else
 		state.BoneCount = 0

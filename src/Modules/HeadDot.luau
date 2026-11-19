@@ -7,6 +7,7 @@
 ]]
 
 local Alpha = require("../Utils/Alpha")
+local Occlusion = require("../Utils/Occlusion")
 
 local HeadDot = {}
 HeadDot.__index = HeadDot
@@ -14,6 +15,7 @@ HeadDot.__index = HeadDot
 function HeadDot.New(ctx)
 	local self = setmetatable({}, HeadDot)
 	self.Settings = ctx.Settings
+	self.Global = ctx.Global
 	self.Dot = ctx.Canvas:Circle(ctx.ZIndex)
 	return self
 end
@@ -27,10 +29,10 @@ function HeadDot:Update(state)
 
 	self.Dot.Position = state.Screen
 	self.Dot.Radius = settings.Radius
-	self.Dot.Color = state.TeamColor or settings.Color
+	self.Dot.Color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
 	self.Dot.Filled = settings.Filled
 	self.Dot.Thickness = 1
-	self.Dot.Transparency = Alpha.apply(settings.Transparency, state.Alpha)
+	self.Dot.Transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, state.Alpha), state, self.Global)
 	self.Dot.Visible = true
 end
 

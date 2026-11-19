@@ -6,7 +6,7 @@ The library is modular: each element is its own module, the rendering backend is
 
 ## Status
 
-`v0.3.0` is the second polish pass: team colours, a soft box glow, measured text chips behind the name and distance, a low-health pulse and percentage text. The dev panel now has a live RGB colour panel. The roadmap lives in `plan.md`.
+`v0.4.0` is the visibility pass: off-screen arrows with a distance label, occluded targets that dim instead of vanishing, boxes that clamp at the near plane, and body-only bounding boxes that ignore hats and accessories. The roadmap lives in `plan.md`.
 
 ## Load it
 
@@ -69,15 +69,18 @@ Global:
 | `Enabled` | `true` | Master switch. |
 | `MaxDistance` | `1000` | Targets past this many studs are skipped. |
 | `TeamCheck` | `false` | Skips players on the local player's team. |
-| `VisibilityCheck` | `false` | Raycasts to the head and hides occluded targets. |
+| `VisibilityCheck` | `false` | Raycasts to the head and tints occluded targets. |
 | `VisibilityInterval` | `0.12` | Seconds between visibility raycasts for one target. |
+| `ShowOccluded` | `true` | Keeps occluded targets on screen with the shared occlusion tint. `false` hides them. |
+| `OccludedColor` | `#848C9C` | Colour used for every occluded element. |
+| `OccludedTransparency` | `0.45` | Added to an occluded element's transparency. |
 | `IgnoreLocal` | `true` | Keeps the local player out of the list. |
 | `IncludeNPCs` | `false` | Also draws humanoid models that are not player characters. |
 | `TeamColor` | `true` | Players with a `Team` use its colour for the box, name, tracer, skeleton and head dot. |
 | `FadeWithDistance` | `true` | Far targets dim toward `FadeFloor` instead of staying at full brightness. |
 | `FadeFloor` | `0.72` | Alpha at `MaxDistance`; `1` disables the effect. |
 
-Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`.
+Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`, `Arrow`.
 
 | Element | Keys |
 | --- | --- |
@@ -89,6 +92,7 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 | `Skeleton` | `Enabled`, `Color`, `Thickness`, `Transparency`, `Joints`, `JointRadius` |
 | `HeadDot` | `Enabled`, `Color`, `Radius`, `Filled`, `Transparency` |
 | `Highlight` | `Enabled`, `Fill`, `Outline`, `FillTransparency`, `OutlineTransparency`, `DepthMode` (`"AlwaysOnTop"`, `"Occluded"`) |
+| `Arrow` | `Enabled`, `Color`, `Size`, `Thickness`, `Transparency`, `Offset`, `Label`, `TextSize`, `TextGap` |
 
 `Distance.Scale` converts studs into the displayed unit; `Suffix` defaults to `"m"` because that is what the scene expects, not because the math converts anything.
 
@@ -103,6 +107,12 @@ Elements: `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, 
 When `TeamColor` is on and a player has a `Team`, the team colour replaces the configured colour on the box, name, tracer, skeleton and head dot. NPCs and teamless players keep the settings colour.
 
 `Health.Percent` shows `0-100%` instead of the raw health value, and only applies while `ShowText` is on. `Health.Pulse` breathes the fill below a quarter health.
+
+With `VisibilityCheck` on, a target whose head is blocked keeps drawing with `OccludedColor` and `OccludedTransparency` added to each element's own transparency. Set `ShowOccluded = false` for the old hide-on-sight behaviour. Health stays untinted so the bar still reads as health.
+
+`Arrow` draws a chevron on the viewport edge for any target outside the viewport, including behind the camera. Only the arrow draws while a target is off screen. `Offset` is the gap from the edge to the arrow tip; `Label` adds the distance readout just inside it.
+
+The bounding box is built from the rig's body parts rather than `GetBoundingBox()`, so hats, accessories and tools do not widen it. When a corner crosses the near plane the box falls back to a distance-scaled projection from the root, so it shrinks instead of vanishing at point-blank range.
 
 ## Security
 
@@ -136,8 +146,9 @@ The render path is built to stay flat as the target count grows:
 
 - Each `Entry` owns one reusable state table. Box, bones and joint points are written in place, so a frame allocates no per-target tables.
 - Canvas proxies compare the new value with the old one and skip the write. Constant properties like colour and thickness cost nothing after the first frame.
-- The bounding box rejects anything behind the camera with a single projection before it projects eight corners.
+- The bounding box projects only the rig's body parts, and falls back to a scaled root-centred box at the near plane.
 - `VisibilityCheck` raycasts at most once per `VisibilityInterval` per target and reuses the result in between.
+- Off-screen targets skip the visibility raycast and draw only the arrow, so nothing outside the viewport pays for the rest of the element set.
 - NPCs are tracked by `DescendantAdded` / `DescendantRemoving` events. A full `workspace:GetDescendants()` walk only runs as an 8-second safety net.
 - Skeleton joint dots are created on first use, so the default settings do not allocate 20 extra objects per target.
 - `Distance` and health text only rebuild their strings when the value changes.
@@ -151,7 +162,7 @@ The render path is built to stay flat as the target count grows:
 - Eight R15 dummies at 10, 25, 50, 100, 200, 350 and 500 studs, plus one behind spawn, each with a different health value.
 - A cover wall at 70 studs so `VisibilityCheck` has something to hide behind.
 - A dev control panel in `StarterPlayerScripts` (`dev/PhasmaDebug.client.luau`) that owns the ESP and toggles each element live, with `IncludeNPCs = true` because the dummies are models rather than players. It is one window with `ESP`, `STYLE`, `ELEMENTS` and `COLOURS` tabs; each tab scrolls independently, so the panel stays a fixed size.
-- The `COLOURS` tab: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline and the health bar background are included.
+- The `COLOURS` tab: pick an element chip, then drag the R, G and B sliders. Edits write straight into `esp.Settings`, so every element recolours on the next frame. Highlight fill and outline, the health bar background and the arrow are included.
 
 Controls: **RightAlt** hides or shows the window, the title bar drags it, and the tab bar switches pages. Every row toggles the matching setting on the next frame. The footer shows the active backend, the target count and the live engine count.
 
@@ -183,7 +194,7 @@ tools\selene.exe example
 tools\selene.exe dev
 
 # bundle dist/Phasma.luau + dist/Phasma.rbxm
-tools\lune.exe run build\init.luau 0.3.0
+tools\lune.exe run build\init.luau 0.4.0
 
 # live loop: rebuild the bundle on save, and serve the place
 tools\darklua.exe process src/Init.luau dist/Phasma.luau -c build/darklua.json -w
@@ -218,10 +229,11 @@ src/
       GuiCanvas.luau     ScreenGui backend
   Modules/
     Box.luau  Name.luau  Distance.luau  Health.luau
-    Tracer.luau  Skeleton.luau  HeadDot.luau  Highlight.luau
+    Tracer.luau  Skeleton.luau  HeadDot.luau  Highlight.luau  Arrow.luau
   Utils/
     Color.luau            health gradient
     Alpha.luau            distance fade helper
+    Occlusion.luau        shared occluded colour and transparency
     Random.luau           random instance tags for security
 example/Phasma_Test.client.luau
 dev/DummySpawner.server.luau

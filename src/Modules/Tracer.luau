@@ -9,6 +9,7 @@
 local UserInputService = game:GetService("UserInputService")
 
 local Alpha = require("../Utils/Alpha")
+local Occlusion = require("../Utils/Occlusion")
 
 local Tracer = {}
 Tracer.__index = Tracer
@@ -16,6 +17,7 @@ Tracer.__index = Tracer
 function Tracer.New(ctx)
 	local self = setmetatable({}, Tracer)
 	self.Settings = ctx.Settings
+	self.Global = ctx.Global
 	self.Line = ctx.Canvas:Line(ctx.ZIndex)
 	return self
 end
@@ -39,9 +41,9 @@ function Tracer:Update(state)
 
 	self.Line.From = originFor(settings.From, camera.ViewportSize)
 	self.Line.To = Vector2.new(state.Box.Center.X, state.Box.Position.Y + state.Box.Size.Y)
-	self.Line.Color = state.TeamColor or settings.Color
+	self.Line.Color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
 	self.Line.Thickness = settings.Thickness
-	self.Line.Transparency = Alpha.apply(settings.Transparency, state.Alpha)
+	self.Line.Transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, state.Alpha), state, self.Global)
 	self.Line.Visible = true
 end
 

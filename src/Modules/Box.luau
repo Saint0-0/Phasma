@@ -9,6 +9,7 @@
 ]]
 
 local Alpha = require("../Utils/Alpha")
+local Occlusion = require("../Utils/Occlusion")
 
 local Box = {}
 Box.__index = Box
@@ -16,6 +17,7 @@ Box.__index = Box
 function Box.New(ctx)
 	local self = setmetatable({}, Box)
 	self.Settings = ctx.Settings
+	self.Global = ctx.Global
 	-- Created first so the wide, faint outline renders behind the box.
 	self.Glow = ctx.Canvas:Rect(ctx.ZIndex)
 	self.Full = ctx.Canvas:Rect(ctx.ZIndex)
@@ -45,16 +47,17 @@ function Box:Update(state)
 
 	local box = state.Box
 	local alpha = state.Alpha
-	local color = state.TeamColor or settings.Color
+	local color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
 	local thickness = settings.Thickness
-	local transparency = Alpha.apply(settings.Transparency, alpha)
+	local transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, alpha), state, self.Global)
 
 	if settings.Glow then
 		self.Glow.Position = box.Position
 		self.Glow.Size = box.Size
 		self.Glow.Color = color
 		self.Glow.Thickness = settings.GlowThickness or 3
-		self.Glow.Transparency = Alpha.apply(settings.GlowTransparency or 0.88, alpha)
+		self.Glow.Transparency =
+			Occlusion.transparency(Alpha.apply(settings.GlowTransparency or 0.88, alpha), state, self.Global)
 		self.Glow.Filled = false
 		self.Glow.Visible = true
 	else
@@ -65,7 +68,8 @@ function Box:Update(state)
 		self.Fill.Position = box.Position
 		self.Fill.Size = box.Size
 		self.Fill.Color = color
-		self.Fill.Transparency = Alpha.apply(settings.FillTransparency, alpha)
+		self.Fill.Transparency =
+			Occlusion.transparency(Alpha.apply(settings.FillTransparency, alpha), state, self.Global)
 		self.Fill.Filled = true
 		self.Fill.Visible = true
 	else

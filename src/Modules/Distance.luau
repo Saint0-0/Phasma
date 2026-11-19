@@ -11,6 +11,7 @@
 
 local Constants = require("../Constants")
 local Alpha = require("../Utils/Alpha")
+local Occlusion = require("../Utils/Occlusion")
 
 local Distance = {}
 Distance.__index = Distance
@@ -18,6 +19,7 @@ Distance.__index = Distance
 function Distance.New(ctx)
 	local self = setmetatable({}, Distance)
 	self.Settings = ctx.Settings
+	self.Global = ctx.Global
 	-- The chip is created first so it renders behind the text.
 	self.Chip = ctx.Canvas:Rect(ctx.ZIndex)
 	self.Text = ctx.Canvas:Text(ctx.ZIndex)
@@ -84,8 +86,8 @@ function Distance:Update(state)
 		self.Chip.Visible = false
 	end
 
-	self.Text.Color = settings.Color
-	self.Text.Transparency = settings.Transparency
+	self.Text.Color = Occlusion.color(settings.Color, state, self.Global)
+	self.Text.Transparency = Occlusion.transparency(settings.Transparency, state, self.Global)
 	self.Text.Outline = settings.Outline
 	self.Text.OutlineTransparency = settings.OutlineTransparency or 0.5
 	self.Text.Position = center

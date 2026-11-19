@@ -9,6 +9,7 @@
 ]]
 
 local Alpha = require("../Utils/Alpha")
+local Occlusion = require("../Utils/Occlusion")
 
 local POOL = 16
 local DOTS = 20
@@ -19,6 +20,7 @@ Skeleton.__index = Skeleton
 function Skeleton.New(ctx)
 	local self = setmetatable({}, Skeleton)
 	self.Settings = ctx.Settings
+	self.Global = ctx.Global
 	self.Canvas = ctx.Canvas
 	self.ZIndex = ctx.ZIndex
 	self.Lines = table.create(POOL)
@@ -38,8 +40,8 @@ function Skeleton:Update(state)
 		return
 	end
 
-	local transparency = Alpha.apply(settings.Transparency, state.Alpha)
-	local color = state.TeamColor or settings.Color
+	local transparency = Occlusion.transparency(Alpha.apply(settings.Transparency, state.Alpha), state, self.Global)
+	local color = Occlusion.color(state.TeamColor or settings.Color, state, self.Global)
 	local thickness = settings.Thickness
 	local count = state.BoneCount
 

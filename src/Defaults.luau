@@ -19,6 +19,11 @@ local Defaults = {
 	-- Seconds between visibility raycasts for one target. The result is reused
 	-- in between, which keeps the cost flat on crowded servers.
 	VisibilityInterval = 0.12,
+	-- Occluded targets keep drawing with a shared tint instead of vanishing.
+	-- Applies only while VisibilityCheck is on.
+	ShowOccluded = true,
+	OccludedColor = Color3.fromRGB(132, 140, 156),
+	OccludedTransparency = 0.45,
 	IgnoreLocal = true,
 	IncludeNPCs = false,
 	-- Players with a Team take their TeamColor for the box, name, tracer,
@@ -127,6 +132,21 @@ local Defaults = {
 		FillTransparency = 0.85,
 		OutlineTransparency = 0.35,
 		DepthMode = "AlwaysOnTop",
+	},
+
+	-- Edge chevrons for targets outside the viewport, including behind you.
+	Arrow = {
+		Enabled = true,
+		Color = Palette.Accent,
+		Size = 9,
+		Thickness = 2,
+		Transparency = 0.1,
+		-- Distance from the screen edge to the arrow tip.
+		Offset = 16,
+		-- Shows the target distance just inside the arrow.
+		Label = true,
+		TextSize = 11,
+		TextGap = 22,
 	},
 
 	-- Reduces casual detection only. Nothing client-side can hide from a
