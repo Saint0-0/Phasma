@@ -2,14 +2,61 @@
 	Phasma/example/Phasma_Test.client.luau
 
 	Showcase configuration. Copy this file and adjust the settings for your
-	own place. The library is required from ReplicatedStorage.Phasma.Init.
+	own place. The library is loaded from ReplicatedStorage.Phasma.Init when
+	it is present, with a fallback to the latest release.
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Phasma = require(ReplicatedStorage:WaitForChild("Phasma"):WaitForChild("Init"))
+local RELEASE_URL = "https://github.com/Saint0-0/Phasma/releases/latest/download/Phasma.luau"
+local LOAD_TIMEOUT = 5
+
+-- Waits for the place copy of the library within a single time budget. The
+-- caller falls back to the release bundle when the module is not present.
+local function loadFromPlace(timeout)
+	local deadline = os.clock() + timeout
+	local folder = ReplicatedStorage:FindFirstChild("Phasma")
+	if not folder then
+		folder = ReplicatedStorage:WaitForChild("Phasma", timeout)
+	end
+	if not folder then
+		return nil
+	end
+
+	local remaining = deadline - os.clock()
+	if remaining <= 0 then
+		return nil
+	end
+
+	local init = folder:FindFirstChild("Init") or folder:WaitForChild("Init", remaining)
+	if not init then
+		return nil
+	end
+
+	local ok, result = pcall(require, init)
+	if ok then
+		return result
+	end
+	return nil
+end
+
+-- game:HttpGet is supplied by executors and is not part of the Roblox API.
+-- selene: allow(incorrect_standard_library_use)
+local function loadFromRelease()
+	if not game.HttpGet then
+		error("[Phasma] ReplicatedStorage.Phasma.Init is missing and game:HttpGet is unavailable")
+	end
+	local source = game:HttpGet(RELEASE_URL)
+	local chunk = loadstring(source)
+	if not chunk then
+		error("[Phasma] the release bundle could not be compiled")
+	end
+	return chunk()
+end
+
+local Phasma = loadFromPlace(LOAD_TIMEOUT) or loadFromRelease()
 
 local esp = Phasma:CreateESP({
 	MaxDistance = 1200,

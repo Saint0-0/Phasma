@@ -2,7 +2,7 @@
 
 ## Loading
 
-The library can be loaded in three ways.
+The library can be loaded in three ways. The README provides a combined loader that tries `ReplicatedStorage.Phasma.Init` with a five second timeout and falls back to the release file. The forms below cover each source on its own.
 
 From a release, as a single file:
 

@@ -23,10 +23,57 @@ The name comes from the Greek word *phasma*, which means apparition or phantom. 
 
 ## Installation
 
-### Executors
+### Executors and Studio
+
+The loader below first looks for `ReplicatedStorage.Phasma.Init`. It waits up to five seconds for the folder and the module, which covers the test place and Studio, and then falls back to the latest release bundle when the module is not present. The timeout prevents a client without the module from waiting indefinitely.
 
 ```lua
-local Phasma = loadstring(game:HttpGet("https://github.com/Saint0-0/Phasma/releases/latest/download/Phasma.luau"))()
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local RELEASE_URL = "https://github.com/Saint0-0/Phasma/releases/latest/download/Phasma.luau"
+local LOAD_TIMEOUT = 5
+
+local function loadFromPlace(timeout)
+	local deadline = os.clock() + timeout
+	local folder = ReplicatedStorage:FindFirstChild("Phasma")
+	if not folder then
+		folder = ReplicatedStorage:WaitForChild("Phasma", timeout)
+	end
+	if not folder then
+		return nil
+	end
+
+	local remaining = deadline - os.clock()
+	if remaining <= 0 then
+		return nil
+	end
+
+	local init = folder:FindFirstChild("Init") or folder:WaitForChild("Init", remaining)
+	if not init then
+		return nil
+	end
+
+	local ok, result = pcall(require, init)
+	if ok then
+		return result
+	end
+	return nil
+end
+
+-- game:HttpGet is supplied by executors and is not part of the Roblox API.
+local function loadFromRelease()
+	if not game.HttpGet then
+		error("[Phasma] ReplicatedStorage.Phasma.Init is missing and game:HttpGet is unavailable")
+	end
+	local source = game:HttpGet(RELEASE_URL)
+	local chunk = loadstring(source)
+	if not chunk then
+		error("[Phasma] the release bundle could not be compiled")
+	end
+	return chunk()
+end
+
+local Phasma = loadFromPlace(LOAD_TIMEOUT) or loadFromRelease()
 ```
 
 ### Model
@@ -48,9 +95,9 @@ tools\rojo.exe serve default.project.json
 
 ## Quick start
 
-```lua
-local Phasma = require(game:GetService("ReplicatedStorage").Phasma.Init)
+With `Phasma` loaded as shown above:
 
+```lua
 local esp = Phasma:CreateESP({
 	MaxDistance = 1000,
 	TeamCheck = false,
