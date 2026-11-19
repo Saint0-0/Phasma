@@ -69,6 +69,7 @@ local function toggleRow(parent, order, label, get, set)
 	text.TextColor3 = COLORS.Text
 	text.TextXAlignment = Enum.TextXAlignment.Left
 	text.Text = label
+	text.Active = true
 	text.Parent = row
 
 	local pill = Instance.new("Frame")
@@ -93,9 +94,25 @@ local function toggleRow(parent, order, label, get, set)
 		knob.Position = on and UDim2.new(1, -12, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)
 	end
 
-	row.MouseButton1Click:Connect(function()
+	-- A click can arrive from the button or from the label on top of it; the
+	-- debounce keeps one press from toggling twice.
+	local last = 0
+	local function toggle()
+		local now = os.clock()
+		if now - last < 0.15 then
+			return
+		end
+		last = now
 		set(not get())
 		refresh()
+		print(string.format("[Phasma] %s = %s", label, tostring(get())))
+	end
+
+	row.MouseButton1Click:Connect(toggle)
+	text.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			toggle()
+		end
 	end)
 
 	refresh()
@@ -279,6 +296,13 @@ end
 
 titleLabel.Text = "PHASMA  v" .. Phasma.Version
 
+-- One frame first, so any script that creates an ESP on startup has already
+-- done so. StopAll then removes every earlier engine, leaving exactly one.
+task.wait()
+if Phasma.StopAll then
+	Phasma:StopAll()
+end
+
 local created, result = pcall(function()
 	return Phasma:CreateESP({
 		MaxDistance = 1200,
@@ -351,7 +375,20 @@ RunService.Heartbeat:Connect(function(delta)
 	for _ in pairs(esp._entries) do
 		count = count + 1
 	end
-	status.Text = string.format("%s backend  |  %d targets", esp.Canvas.Kind, count)
+
+	local overlays = 0
+	for _, child in ipairs(playerGui:GetChildren()) do
+		if child:IsA("ScreenGui") and child.Name == "Phasma" then
+			overlays = overlays + 1
+		end
+	end
+
+	local engines = 0
+	if Phasma.GetActiveCount then
+		engines = Phasma:GetActiveCount()
+	end
+
+	status.Text = string.format("%s | %d targets | %d esp | %d overlay", esp.Canvas.Kind, count, engines, overlays)
 end)
 
 local dragging = false
