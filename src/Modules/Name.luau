@@ -2,7 +2,7 @@
 	Phasma/Modules/Name.luau
 
 	Player name above the box. The optional chip is measured from the rendered
-	text, so it hugs the label on both backends.
+	text, so it hugs the label on the first frame.
 
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0
@@ -52,8 +52,8 @@ function Name:Update(state)
 		self.MeasuredSize = settings.TextSize
 		self.MeasureTries = 0
 	end
-	-- TextBounds can lag by a frame on some Drawing builds, so an estimate is
-	-- retried for a few frames before it is kept.
+	-- A measurement can lag by a frame right after the label is created, so
+	-- an estimate is retried for a few frames before it is kept.
 	if changed or (not self.MeasuredExact and self.MeasureTries < 12) then
 		local bounds, exact = self.Text:Measure()
 		self.Bounds = bounds

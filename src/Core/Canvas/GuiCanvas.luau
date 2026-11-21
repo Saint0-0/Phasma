@@ -1,8 +1,8 @@
 --[[
 	Phasma/Core/Canvas/GuiCanvas.luau
 
-	ScreenGui backend used in Studio and on executors without Drawing. Same
-	proxy surface as DrawingCanvas, built from Frames, TextLabels and UIStrokes.
+	ScreenGui backend. It is the only renderer, verified in Studio, and it is
+	built from Frames, TextLabels and UIStrokes.
 
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0

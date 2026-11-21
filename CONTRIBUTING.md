@@ -9,7 +9,7 @@ Phasma is a client-side ESP library for Roblox executors. Contributions that imp
 Open a GitHub issue and include the following information:
 
 - The Phasma version, available through `Phasma.Version`.
-- The active backend, available through `esp.Canvas.Kind`.
+- The renderer name, available through `esp.Canvas.Kind`.
 - The executor name and version, when the bug only occurs outside Studio.
 - A short description of the expected behaviour and the observed behaviour.
 - The smallest configuration that reproduces the problem.

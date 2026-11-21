@@ -2,8 +2,8 @@
 	Phasma/Modules/Health.luau
 
 	Health bar beside (vertical) or under (horizontal) the box. The fill eases
-	toward the real health value, and filled end caps make it a capsule on both
-	backends. An optional attribute-driven bar covers armour or shields.
+	toward the real health value, and filled end caps make it a capsule at any
+	size. An optional attribute-driven bar covers armour or shields.
 
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0

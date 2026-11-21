@@ -1,9 +1,9 @@
 --[[
 	Phasma/Utils/Anim.luau
 
-	Frame-rate independent easing for the canvas elements. TweenService only
-	animates Instances, so the ESP runs its own scalar tracks: no tweens to
-	allocate and identical behaviour on both backends.
+	Frame-rate independent easing for the canvas elements. The ESP runs its own
+	scalar tracks rather than one tween per channel, so the cost stays flat and
+	the same tracks drive every element.
 
 	License: MPL-2.0 - https://mozilla.org/MPL/2.0/
 	Copyright (c) 2026 Saint0-0

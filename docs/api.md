@@ -29,7 +29,7 @@ local Phasma = require(game:GetService("ReplicatedStorage"):WaitForChild("Phasma
 | `Phasma.Version` | The current version string. |
 | `Phasma.Defaults` | The default settings table. Treat it as read-only. |
 | `Phasma.Presets` | The preset definitions and lookup helpers. |
-| `Phasma.Canvas` | The backend selector. `Phasma.Canvas.new(security)` returns a canvas. |
+| `Phasma.Canvas` | The canvas factory. `Phasma.Canvas.new(security)` returns the ScreenGui canvas. |
 | `Phasma:CreateESP(settings)` | Creates, starts and returns an ESP object. |
 | `Phasma:GetActiveCount()` | Returns the number of ESP objects that are still alive. |
 | `Phasma:StopAll()` | Destroys every ESP object created through the module. |
@@ -52,7 +52,7 @@ The module keeps weak references to every ESP it creates. A script that creates 
 | `esp:Stop()` | Disconnects the render loop and hides the overlay. |
 | `esp:Destroy()` | Stops the render loop, destroys the elements and removes the overlay. |
 | `esp.Settings` | The live settings table. Edit values in place. |
-| `esp.Canvas.Kind` | The active backend, either `"Drawing"` or `"Gui"`. |
+| `esp.Canvas.Kind` | The renderer name, always `"Gui"`. |
 
 `CreateESP` starts the render loop immediately. `Stop` disconnects the loop and hides the overlay while the object remains valid, and `Start` can be called again on the same object. `Destroy` releases the canvas objects and should be used when the ESP is no longer needed.
 

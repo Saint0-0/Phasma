@@ -155,5 +155,5 @@ local esp = Phasma:CreateESP({
 -- esp:SetTarget(workspace:WaitForChild("Chest"))
 -- esp:ClearTarget()
 
-print(("[Phasma] v%s running on the %s backend."):format(Phasma.Version, esp.Canvas.Kind))
+print(("[Phasma] v%s running on the %s renderer."):format(Phasma.Version, esp.Canvas.Kind))
 print(("[Phasma] presets: %s"):format(table.concat(esp:ListPresets(), ", ")))

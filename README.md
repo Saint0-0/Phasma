@@ -1,13 +1,13 @@
 # Phasma
 
-Phasma is a modular ESP library for Roblox executors. It draws boxes, names, distances, health bars, tracers, skeletons, facing markers and highlights over players, and it can draw tagged objects such as loot or chests. The library uses the Drawing API when the executor provides one and falls back to a ScreenGui overlay on every other client.
+Phasma is a modular ESP library for Roblox executors. It draws boxes, names, distances, health bars, tracers, skeletons, facing markers and highlights over players, and it can draw tagged objects such as loot or chests. Rendering uses a ScreenGui overlay, the same path that is verified in Studio, so every box style and element looks identical on an executor.
 
 The name comes from the Greek word *phasma*, which means apparition or phantom. The project is written in Luau and released under the Mozilla Public License 2.0.
 
 ## Features
 
 - Ten independent elements: Box, Name, Distance, Health, Tracer, Skeleton, HeadDot, Highlight, Direction and Arrow.
-- Two rendering backends behind one object surface: Drawing and ScreenGui.
+- One ScreenGui rendering path, verified in Studio and used unchanged on executors.
 - Filters by name, UserId or team, a case-insensitive name substring, a target cap and priority sorting.
 - Distance-based level of detail, with throttled rebuilds for far targets.
 - Object ESP for tagged or named Models and BaseParts.
@@ -19,7 +19,7 @@ The name comes from the Greek word *phasma*, which means apparition or phantom. 
 
 ## Requirements
 
-- A Roblox executor for runtime use. The Drawing API is preferred, and the ScreenGui backend covers clients that do not expose it.
+- A Roblox executor for runtime use. Rendering uses a ScreenGui overlay, which works on every client and matches Studio.
 - Roblox Studio, Rojo, Selene, StyLua, Lune and darklua for development from source. The versions used by this project are listed in [docs/development.md](docs/development.md).
 
 ## Installation
@@ -90,7 +90,7 @@ local Phasma = require(game:GetService("ReplicatedStorage").Phasma.Init)
 The repository ships a `default.project.json` that maps the built module and a demonstration script. Build the module first, then serve the project.
 
 ```powershell
-tools\lune.exe run build\init.luau 0.7.0
+tools\lune.exe run build\init.luau 0.7.1
 tools\rojo.exe serve default.project.json
 ```
 
@@ -162,18 +162,18 @@ While focus is active, filters, `MaxDistance`, `Objects.MaxDistance`, `IncludeNP
 | --- | --- |
 | [API reference](docs/api.md) | Library object, module functions, presets and live settings. |
 | [Configuration](docs/configuration.md) | Every setting, element key and behaviour note. |
-| [Architecture](docs/architecture.md) | Render flow, backends, projection, performance and security model. |
+| [Architecture](docs/architecture.md) | Render flow, canvas, projection, performance and security model. |
 | [Development](docs/development.md) | Tooling, build commands, release process and conventions. |
 | [Changelog](CHANGELOG.md) | Version history. |
 | [Contributing](CONTRIBUTING.md) | Bug reports, change proposals and code style. |
 
 ## Version
 
-The current version is `v0.7.0`, the focus pass. It adds single-target focus through `esp:SetTarget`, `esp:ClearTarget` and `esp:GetTarget`, with a live `Focus.Target` setting. Focus follows a Player through a respawn, accepts a Model, Humanoid or BasePart, and draws the chosen target at any distance while every other target fades out. The animation system from `v0.6.0` is unchanged.
+The current version is `v0.7.1`, the renderer alignment patch. It removes the executor Drawing path so every client uses the ScreenGui renderer that is verified in Studio, which restores the box styles and keeps the element output identical across Studio and executors. The focus pass from `v0.7.0` is unchanged.
 
 ## Security notice
 
-Phasma is a client-side library. Its security options reduce casual detection, but no client-side measure can hide from a determined anti-cheat. The Drawing backend creates no Instances, while the ScreenGui backend relies on `gethui`, `protectgui` and randomised names. Use the library in environments where client modification is permitted.
+Phasma is a client-side library. Its security options reduce casual detection, but no client-side measure can hide from a determined anti-cheat. The overlay is a ScreenGui that relies on `gethui`, `protectgui` and randomised names. Use the library in environments where client modification is permitted.
 
 ## License
 

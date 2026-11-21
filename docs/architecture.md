@@ -2,7 +2,7 @@
 
 ## Overview
 
-Phasma separates three concerns: a rendering backend, a set of element modules, and a small core that turns the game state into draw calls.
+Phasma separates three concerns: a rendering canvas, a set of element modules, and a small core that turns the game state into draw calls.
 
 ```
 RenderStepped
@@ -18,18 +18,15 @@ RenderStepped
 
 `ESP` owns the render loop, the settings table, the candidate pools and the entries. Each entry represents one target and owns every canvas object for that target. Resolving a target writes into a reusable state table, so the common frame performs no per-target allocations.
 
-## Backends
+## Rendering
 
-`Phasma.Canvas.new(security)` selects a backend once:
+`Phasma.Canvas.new(security)` returns the ScreenGui canvas. It is the renderer that is verified in Studio, and every client uses it, so the Drawing API that an executor may expose never changes the output.
 
-- **Drawing** when the executor exposes `Drawing.new`. This is the fast path.
-- **Gui** otherwise. It builds a `ScreenGui` of Frames, TextLabels and UIStrokes, and is the path used in Studio.
-
-Both backends expose the same surface: `Line`, `Rect`, `Text` and `Circle`. Each element module receives a canvas object with the same property names, so no module branches on the backend. Canvas proxies compare the new value with the previous one and skip the write when they match. Constant properties therefore cost nothing after the first frame.
+The canvas exposes `Line`, `Rect`, `Text` and `Circle`. Each element module receives a canvas object with plain property names, so no module branches on a renderer. Canvas proxies compare the new value with the previous one and skip the write when they match. Constant properties therefore cost nothing after the first frame.
 
 ## Projection
 
-Projection uses `Camera:WorldToViewportPoint`. That is the inset free space used by the Drawing API, and the same space a ScreenGui occupies when `IgnoreGuiInset` is set. Both backends therefore land on the same pixels. `WorldToScreenPoint` would shift every element down by the top bar.
+Projection uses `Camera:WorldToViewportPoint`, which is the inset free space a ScreenGui occupies when `IgnoreGuiInset` is set. `WorldToScreenPoint` would shift every element down by the top bar.
 
 The bounding box is built from the rig's body parts instead of `GetBoundingBox()`, so accessories, hats and tools do not widen it. If a corner crosses the near plane, the entry falls back to a distance-scaled projection from the root. The box shrinks at point-blank range instead of disappearing.
 
@@ -48,7 +45,7 @@ The animation model is deliberately small. `Utils/Anim` exposes four functions:
 - `Anim.back(value, overshoot)` is an ease-out back curve that overshoots before it settles.
 - `Anim.approach(current, target, speed, delta)` is a legacy exponential helper that remains for callers that prefer a convergence rate.
 
-`Entry:StepAnim` advances the raw tracks and derives the display values once per-frame. The element modules read the display values and never apply easing themselves. This keeps the cost at one number per-channel per-target per-frame and avoids `TweenService`, which cannot animate Drawing objects in any case.
+`Entry:StepAnim` advances the raw tracks and derives the display values once per-frame. The element modules read the display values and never apply easing themselves. This keeps the cost at one number per-channel per-target per-frame and avoids allocating tween objects.
 
 The channels are `Fade`, `Pop`, `Slide`, `Sweep`, `Tracer` and `Arrow`. Pop, slide, sweep, tracer and arrow animate inward only. A retiring entry fades out with its other elements rather than reversing the entrance. The tracer also replays when a target returns to view after at least 0.2 seconds off-screen, which prevents a target that moves along the viewport edge from restarting the draw every frame.
 
@@ -81,10 +78,9 @@ The render path is designed to stay flat as the target count grows.
 
 Security is a set of noise reduction measures, not a guarantee.
 
-- The Drawing backend creates no Instances, so there is no overlay object for a game script to find.
-- The Gui backend prefers `gethui()` when the executor exposes it, calls `protectgui` (or `syn.protect_gui`) when available, and can randomise the ScreenGui name and the name of every child.
+- The overlay prefers `gethui()` when the executor exposes it, calls `protectgui` (or `syn.protect_gui`) when available, and can randomise the ScreenGui name and the name of every child.
 - `Highlight` can be parented to the camera with an `Adornee`, which keeps it out of the character hierarchy.
-- The guard rails are client-side. A game that fingerprints Drawing objects or inspects process memory can still identify the overlay.
+- The guard rails are client-side. A game that inspects the overlay hierarchy or process memory can still identify it.
 
 ## Repository layout
 
@@ -100,10 +96,9 @@ src/
     Target.luau          bounding box, bones, distance, health, facing
     Camera.luau          projection helpers
     Config.luau          deep merge and in-place apply
-    Canvas.luau          backend selection
+    Canvas.luau          canvas factory
     Canvas/
-      DrawingCanvas.luau Drawing API backend
-      GuiCanvas.luau     ScreenGui backend
+      GuiCanvas.luau     ScreenGui canvas
   Modules/
     Box.luau  Name.luau  Distance.luau  Health.luau
     Tracer.luau  Skeleton.luau  HeadDot.luau  Direction.luau
@@ -123,6 +118,6 @@ docs/                    user and developer documentation
 
 - **Elements are per-target objects.** A shared element set would require per player state inside every module. Rebuilding on respawn is simpler and bounded.
 - **Settings are live tables.** There is no setter layer to maintain. Mutating `esp.Settings` is the supported path, and the next frame observes the change.
-- **Chips are measured, not guessed.** `TextService` and `TextBounds` are accurate enough for the first frame. Re-measuring only when the string changes keeps the common frame free of text measurement.
+- **Chips are measured, not guessed.** `TextService` is accurate enough for the first frame. Re-measuring only when the string changes keeps the common frame free of text measurement.
 - **Team colour is a state override.** `Target` writes `state.TeamColor`, and each element falls back to its configured colour. The colour settings therefore still apply to NPCs and players without a team.
 - **The bundle is the shipping unit.** The source uses darklua path requires, which Roblox cannot resolve directly. The build step produces the single file and the model from the same source.

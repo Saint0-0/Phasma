@@ -33,9 +33,9 @@ local Defaults = {
 	FadeWithDistance = true,
 	FadeFloor = 0.72,
 
-	-- Target-level transitions. Time-based scalar tracks rather than
-	-- TweenService: Drawing objects are not Instances. Every channel has its
-	-- own switch, so any one of them can be left instant while the rest move.
+	-- Target-level transitions. Time-based scalar tracks rather than one tween
+	-- per channel. Every channel has its own switch, so any one of them can be
+	-- left instant while the rest move.
 	Animations = {
 		Enabled = true,
 		-- Duration multiplier: 2 is twice as fast, 0.5 is half speed, 0 snaps.

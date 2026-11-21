@@ -2,6 +2,18 @@
 
 All notable changes to Phasma are recorded here. The format follows the conventions of Keep a Changelog, and the project uses semantic versioning.
 
+## 0.7.1 (2026-11-21)
+
+### Fixed
+
+- Box styles, including `"Corners"` and `"Both"`, now render on executors. The executor Drawing path is gone, so every client uses the ScreenGui renderer that is verified in Studio.
+
+### Changed
+
+- `Phasma.Canvas.new` always returns the ScreenGui canvas, and `esp.Canvas.Kind` is always `"Gui"`.
+- Removed the Drawing backend, the `Drawing` global from the editor diagnostics and `Constants.DrawingFont`.
+- Documentation now describes a single rendering path instead of two backends.
+
 ## 0.7.0 (2026-11-21)
 
 ### Added

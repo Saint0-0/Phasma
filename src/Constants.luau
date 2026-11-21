@@ -8,19 +8,16 @@
 
 local Constants = {}
 
-Constants.Version = "0.7.0"
+Constants.Version = "0.7.1"
 Constants.Name = "Phasma"
 
--- Overlay identity. The GUI backend uses these for its ScreenGui unless
+-- Overlay identity. The ScreenGui uses these names unless
 -- Security.RandomizeNames replaces them with a random tag.
 Constants.ScreenGuiName = "Phasma"
 Constants.DisplayOrder = 999999
 Constants.Font = Enum.Font.GothamBold
 Constants.FontMedium = Enum.Font.GothamMedium
 Constants.OutlineColor = Color3.fromRGB(0, 0, 0)
-
--- Drawing text fonts are numeric; 2 is Plex on the common executors.
-Constants.DrawingFont = 2
 
 -- Cool, desaturated palette. Text stays near-white, the accent is a soft
 -- cyan, and the fills are dark enough to read against any scene.

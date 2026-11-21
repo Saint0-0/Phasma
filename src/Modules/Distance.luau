@@ -59,8 +59,8 @@ function Distance:Update(state)
 		self.MeasuredSize = settings.TextSize
 		self.MeasureTries = 0
 	end
-	-- TextBounds can lag by a frame on some Drawing builds, so an estimate is
-	-- retried for a few frames before it is kept.
+	-- A measurement can lag by a frame right after the label is created, so
+	-- an estimate is retried for a few frames before it is kept.
 	if changed or (not self.MeasuredExact and self.MeasureTries < 12) then
 		local bounds, exact = self.Text:Measure()
 		self.Bounds = bounds

@@ -118,13 +118,13 @@ The available elements are `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skele
 
 `Distance.Scale` converts studs into the displayed unit. `Suffix` defaults to `"m"` because that is what the scene expects, not because the library converts the value.
 
-`Health.Smoothing` is the convergence speed of the fill. `0` snaps instantly. `Health.Rounded` adds capsule end caps, which work identically on both backends because they are drawn as filled circles rather than UI corners.
+`Health.Smoothing` is the convergence speed of the fill. `0` snaps instantly. `Health.Rounded` adds capsule end caps, which are drawn as filled circles rather than UI corners.
 
 `Box.Style = "Corners"` is the default look: four brackets over a very faint fill. `"Full"` is a plain outline, and `"Both"` combines them. `CornerScale` sets the bracket length as a fraction of the shorter box side, clamped by `CornerMin` and `CornerMax`.
 
 `Box.Glow` adds a second, wider outline behind the box. `GlowThickness` and `GlowTransparency` shape it. Keep the transparency high so it reads as light rather than as a second box.
 
-`Name.Background` and `Distance.Background` draw a chip behind the text. The chip is measured from the rendered string through `TextService` on the Gui backend and `TextBounds` on the Drawing backend, so it hugs the label on both. `Padding` is the inset on each side.
+`Name.Background` and `Distance.Background` draw a chip behind the text. The chip is measured from the rendered string through `TextService`, so it hugs the label on the first frame. `Padding` is the inset on each side.
 
 When `TeamColor` is on and a player has a `Team`, the team colour replaces the configured colour on the box, name, tracer, skeleton and head dot. NPCs and players without a team keep the settings colour.
 
@@ -159,6 +159,6 @@ Every element follows the tint, including text chips, health text, skeleton join
 | `Security.ProtectGui` | `true` | Calls `protectgui` (or `syn.protect_gui`) so game scripts cannot reach the overlay. |
 | `Security.HideHighlight` | `true` | Parents `Highlight` to the camera with an `Adornee`, so it is not a child of the character. |
 
-The GUI backend already prefers `gethui()` over `PlayerGui` when an executor exposes it. The Drawing backend creates no Instances at all, so it has no names to randomise.
+The overlay prefers `gethui()` over `PlayerGui` when an executor exposes it, so a game script cannot reach it through the player hierarchy.
 
 Because the overlay name is random by default, a script that counts Instances by name can report `0`. Count the active ESP objects through `Phasma:GetActiveCount()` instead.
