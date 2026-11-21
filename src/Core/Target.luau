@@ -531,8 +531,10 @@ local function resolveFacing(state, camera, cframe, cframeScreen)
 end
 
 -- Fills `entry.State` for this frame. Returns false when the target should not
--- be drawn at all, in which case the entry is hidden.
-function Target.build(entry, name, player, camera, origin, settings)
+-- be drawn at all, in which case the entry is hidden. `focused` bypasses the
+-- distance cutoff and level of detail, because a chosen target is the only one
+-- on screen and should stay complete at any range.
+function Target.build(entry, name, player, camera, origin, settings, focused)
 	local character = entry.Character
 	if not character or not character.Parent then
 		return false
@@ -549,7 +551,7 @@ function Target.build(entry, name, player, camera, origin, settings)
 	end
 
 	local distance = (root.Position - origin).Magnitude
-	if distance > settings.MaxDistance then
+	if not focused and distance > settings.MaxDistance then
 		return false
 	end
 
@@ -584,7 +586,14 @@ function Target.build(entry, name, player, camera, origin, settings)
 		state.TeamColor = nil
 	end
 
-	applyLOD(state, settings, distance)
+	if focused then
+		state.Detail = true
+		state.ShowSkeleton = true
+		state.ShowChips = true
+		state.ShowTracer = true
+	else
+		applyLOD(state, settings, distance)
+	end
 	resolveScreen(state, camera, root.Position, rootScreen, boxOk)
 	resolveFacing(state, camera, head.CFrame, headScreen)
 
@@ -600,7 +609,9 @@ end
 
 -- Fills the state for a non-humanoid Model or BasePart. Objects share the
 -- Box, Name, Distance and Arrow elements but never get a skeleton or health.
-function Target.buildObject(entry, name, object, camera, origin, settings)
+-- `focused` bypasses the object distance cutoff and forces the edge arrow, so
+-- a chosen target stays reachable when it leaves the viewport.
+function Target.buildObject(entry, name, object, camera, origin, settings, focused)
 	if not object or not object.Parent then
 		return false
 	end
@@ -618,7 +629,7 @@ function Target.buildObject(entry, name, object, camera, origin, settings)
 	local objectSettings = settings.Objects
 	local maxDistance = objectSettings and objectSettings.MaxDistance or settings.MaxDistance
 	local distance = (boxCFrame.Position - origin).Magnitude
-	if distance > maxDistance then
+	if not focused and distance > maxDistance then
 		return false
 	end
 
@@ -640,7 +651,7 @@ function Target.buildObject(entry, name, object, camera, origin, settings)
 	state.TeamColor = objectSettings and objectSettings.Color or nil
 	state.BaseAlpha = distanceAlpha(settings, distance, maxDistance)
 	state.Alpha = state.BaseAlpha
-	state.ShowArrow = objectSettings == nil or objectSettings.ShowArrow ~= false
+	state.ShowArrow = focused or objectSettings == nil or objectSettings.ShowArrow ~= false
 	state.Detail = true
 	state.ShowSkeleton = false
 	state.ShowChips = true

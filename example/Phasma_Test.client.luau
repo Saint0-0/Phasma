@@ -148,5 +148,12 @@ local esp = Phasma:CreateESP({
 -- "Performance". Applying one only touches the appearance blocks.
 -- esp:ApplyPreset("Clean")
 
+-- Single-target focus. Pass a Player, Model, Humanoid or BasePart to draw only
+-- that target, then call SetTarget again when an autofarm route advances. The
+-- normal candidate list returns with ClearTarget.
+-- esp:SetTarget(workspace:WaitForChild("Bandit"))
+-- esp:SetTarget(workspace:WaitForChild("Chest"))
+-- esp:ClearTarget()
+
 print(("[Phasma] v%s running on the %s backend."):format(Phasma.Version, esp.Canvas.Kind))
 print(("[Phasma] presets: %s"):format(table.concat(esp:ListPresets(), ", ")))

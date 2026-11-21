@@ -74,6 +74,14 @@ local Defaults = {
 		Priority = "Distance",
 	},
 
+	-- Draw one chosen target and ignore every other candidate. Target accepts
+	-- a Player, Model, Humanoid or BasePart. Set it at runtime with
+	-- esp:SetTarget(instance), esp:ClearTarget() or by assigning this value.
+	-- Explicit focus bypasses filters, distance cutoffs and include flags.
+	Focus = {
+		Target = nil,
+	},
+
 	-- Cheap detail beyond DetailDistance: hide the expensive elements and
 	-- rebuild far targets less often.
 	LOD = {

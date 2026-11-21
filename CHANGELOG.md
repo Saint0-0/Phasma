@@ -2,6 +2,21 @@
 
 All notable changes to Phasma are recorded here. The format follows the conventions of Keep a Changelog, and the project uses semantic versioning.
 
+## 0.7.0 (2026-11-21)
+
+### Added
+
+- Single-target focus through `esp:SetTarget(instance)`, `esp:ClearTarget()` and `esp:GetTarget()`.
+- Live `Focus.Target` setting, accepted at creation time or assigned at runtime.
+- Focus accepts a `Player`, `Model`, `Humanoid` or `BasePart`. A Player follows the character through a respawn, and a Humanoid or body part resolves to its character.
+- Focus bypasses filters, `MaxDistance`, `Objects.MaxDistance`, the level of detail thresholds, the visibility check and the include flags for the chosen target.
+- Object focus forces the edge arrow on so a chosen object remains reachable when it leaves the viewport.
+
+### Changed
+
+- An entry is rebuilt when its owner switches between the humanoid and object element sets.
+- Candidate records store their focus state explicitly, so a pooled record cannot carry a stale bypass into a normal frame.
+
 ## 0.6.0 (2026-11-19)
 
 ### Added

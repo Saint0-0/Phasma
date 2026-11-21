@@ -7,8 +7,8 @@ Phasma separates three concerns: a rendering backend, a set of element modules, 
 ```
 RenderStepped
   -> ESP:Render
-       -> collect humanoid and object candidates
-       -> apply filters, sorting and the target cap
+       -> focus target? one candidate, otherwise collect humanoid and object candidates
+       -> apply filters, sorting and the target cap (skipped while focused)
        -> resolve each candidate into the entry state
        -> Entry:StepAnim
        -> Entry:Draw
@@ -52,12 +52,19 @@ The animation model is deliberately small. `Utils/Anim` exposes four functions:
 
 The channels are `Fade`, `Pop`, `Slide`, `Sweep`, `Tracer` and `Arrow`. Pop, slide, sweep, tracer and arrow animate inward only. A retiring entry fades out with its other elements rather than reversing the entrance. The tracer also replays when a target returns to view after at least 0.2 seconds off-screen, which prevents a target that moves along the viewport edge from restarting the draw every frame.
 
+## Focus
+
+`Focus.Target` is stored as a normalized descriptor rather than resolved again on every frame. A `Player` is stored directly. A character `Model` resolves to its Player when it belongs to one, so a respawn keeps working, and stays a Model otherwise. A `Humanoid` resolves to its parent model, and any other `Model` or `BasePart` resolves to itself. `ESP:_syncFocus` compares the raw target from the live settings table with the cached value, so both `esp:SetTarget` and a direct assignment are handled.
+
+When the descriptor is set, `Render` skips the player, NPC and object collection passes and pushes a single candidate. That candidate carries a `Focus` flag which tells `Target.build` and `Target.buildObject` to bypass distance checks, level of detail and the visibility check. The normal seen and retire loops still run, so the previous target fades out and the new one fades in through the same animation path as any other entry.
+
 ## Performance
 
 The render path is designed to stay flat as the target count grows.
 
 - Each entry owns one reusable state table. Box, bone and joint data are written in place.
 - Candidate records are pooled and reused. Sorting and the target cap only run while `Filters.Enabled` is on.
+- Focus resolves one candidate and skips the collection pass, the filter sort and the LOD rebuild interval.
 - Animations are scalar tracks, not tweens. There are no tween objects to allocate.
 - Beyond `LOD.DetailDistance`, a target rebuilds only every `LOD.UpdateInterval` seconds. The animation step and the element draw still run at full frame rate.
 - Canvas writes are dirty-checked.
@@ -88,7 +95,7 @@ src/
   Defaults.luau          every default setting
   Presets.luau           named looks for ApplyPreset
   Core/
-    ESP.luau             render loop, candidates, filters, objects, entries
+    ESP.luau             render loop, candidates, focus, filters, objects, entries
     Entry.luau           one target's element set and transition state
     Target.luau          bounding box, bones, distance, health, facing
     Camera.luau          projection helpers

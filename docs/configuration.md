@@ -70,6 +70,18 @@ Filters are off by default. Enabling them allows a whitelist, a blacklist and a 
 
 Level of detail is on by default at `600` studs. Beyond that distance the skeleton, chips and tracer are skipped unless their LOD key is set, and each far target rebuilds every `UpdateInterval` seconds instead of every frame. The animation step and the element draw still run at full frame rate.
 
+## Focus
+
+| Key | Default | Description |
+| --- | --- | --- |
+| `Focus.Target` | `nil` | Draws one chosen `Player`, `Model`, `Humanoid` or `BasePart` and ignores every other candidate. |
+
+Focus is normally changed through `esp:SetTarget(instance)`, `esp:ClearTarget()` and `esp:GetTarget()`. The setting is live, so assigning `esp.Settings.Focus.Target` directly also takes effect on the next frame. A Player or a player character is followed through a respawn. A Humanoid or a body part of a character resolves to that character. Any other Model or BasePart uses the object element set.
+
+Explicit focus is a developer decision, so it bypasses every automatic selection rule for the chosen instance: filters, `TeamCheck`, `IgnoreLocal`, `IncludeNPCs`, `Objects.Enabled`, `MaxDistance`, `Objects.MaxDistance`, the level of detail thresholds and the visibility check. Humanoid targets keep the full element set at any distance. Object targets keep Box, Name, Distance and Arrow, and their edge arrow is forced on.
+
+While focus is active, the normal candidate list is suppressed. Other targets fade out with the usual transition when the target is set or changed, and the normal list returns when `ClearTarget` runs. If the focused instance is destroyed, nothing is drawn until a new target is set.
+
 ## Object ESP
 
 | Key | Default | Description |

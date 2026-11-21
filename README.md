@@ -11,6 +11,7 @@ The name comes from the Greek word *phasma*, which means apparition or phantom. 
 - Filters by name, UserId or team, a case-insensitive name substring, a target cap and priority sorting.
 - Distance-based level of detail, with throttled rebuilds for far targets.
 - Object ESP for tagged or named Models and BaseParts.
+- Single-target focus through `esp:SetTarget`, which draws one Player, Model, Humanoid or BasePart and ignores every other candidate.
 - Seven named presets that change appearance without touching filters or security.
 - Time-based entrance and exit animations with per-channel switches.
 - Security defaults that randomise overlay names, protect the GUI and keep Highlight outside the character.
@@ -89,7 +90,7 @@ local Phasma = require(game:GetService("ReplicatedStorage").Phasma.Init)
 The repository ships a `default.project.json` that maps the built module and a demonstration script. Build the module first, then serve the project.
 
 ```powershell
-tools\lune.exe run build\init.luau 0.6.0
+tools\lune.exe run build\init.luau 0.7.0
 tools\rojo.exe serve default.project.json
 ```
 
@@ -122,6 +123,39 @@ esp:ApplyPreset("Clean")
 
 `CreateESP` starts the render loop immediately. Every key is optional, and the table that is passed is merged over the defaults. A partial table such as `{ Box = { Color = Color3.new(1, 0, 0) } }` keeps the remaining box settings.
 
+## Focus a single target
+
+`esp:SetTarget(instance)` limits the ESP to one target. This is useful for autofarm and pathing scripts, where the only thing worth drawing is the destination the character is moving to. Pass a `Player`, `Model`, `Humanoid` or `BasePart`, then call `SetTarget` again when the destination changes.
+
+```lua
+local esp = Phasma:CreateESP({
+	MaxDistance = 1000,
+	Box = { Enabled = true },
+	Name = { Enabled = true },
+	Distance = { Enabled = true },
+})
+
+-- Track a player. The entry follows the character through a respawn.
+esp:SetTarget(game:GetService("Players").SomePlayer)
+
+-- Track an NPC or a loot model.
+esp:SetTarget(workspace:WaitForChild("Bandit"))
+esp:SetTarget(workspace:WaitForChild("Chest"))
+
+-- Track one part, for example a quest marker.
+esp:SetTarget(workspace:WaitForChild("Marker"))
+
+-- Change the destination at runtime.
+esp:SetTarget(workspace:WaitForChild("NextChest"))
+
+-- Return to the normal target list.
+esp:ClearTarget()
+```
+
+While focus is active, filters, `MaxDistance`, `Objects.MaxDistance`, `IncludeNPCs`, `Objects.Enabled`, `IgnoreLocal` and the visibility check do not apply to the focused instance. Humanoid targets keep the full element set, including the skeleton and chips, at any distance. Object targets keep Box, Name, Distance and Arrow, and the edge arrow is forced on so a focused object remains reachable off screen. Other targets fade out through the normal animation path. Focus is also available as `esp.Settings.Focus.Target`, and `esp:GetTarget()` returns the current value.
+
+`SetTarget` returns `false` when the value is not a Player, Model, Humanoid or BasePart, and leaves the current target unchanged. Passing `nil` clears the target. If the instance is destroyed, the ESP draws nothing until a new target is set.
+
 ## Documentation
 
 | Document | Contents |
@@ -135,7 +169,7 @@ esp:ApplyPreset("Clean")
 
 ## Version
 
-The current version is `v0.6.0`, the animation pass. It adds time-based target fades, an overshooting box pop, sliding name and distance chips, a corner-bracket sweep, a tracer that draws from its origin with a glow and a travelling spark, and an edge arrow that slides and grows in. Every animation channel has its own switch and shares one speed multiplier.
+The current version is `v0.7.0`, the focus pass. It adds single-target focus through `esp:SetTarget`, `esp:ClearTarget` and `esp:GetTarget`, with a live `Focus.Target` setting. Focus follows a Player through a respawn, accepts a Model, Humanoid or BasePart, and draws the chosen target at any distance while every other target fades out. The animation system from `v0.6.0` is unchanged.
 
 ## Security notice
 

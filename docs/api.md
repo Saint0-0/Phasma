@@ -44,6 +44,9 @@ The module keeps weak references to every ESP it creates. A script that creates 
 | `esp:SetEnabled(on)` | Shows or hides every element. |
 | `esp:Toggle()` | Flips the enabled state and returns the new one. |
 | `esp:SetMaxDistance(studs)` | Changes the target cutoff. |
+| `esp:SetTarget(instance)` | Draws one chosen Player, Model, Humanoid or BasePart and ignores every other candidate. |
+| `esp:ClearTarget()` | Returns to the normal target list. |
+| `esp:GetTarget()` | Returns the current focus target, or `nil`. |
 | `esp:ApplyPreset(name)` | Applies a named look and returns `true`, or `false` for an unknown name. |
 | `esp:ListPresets()` | Returns the preset names in sorted order. |
 | `esp:Stop()` | Disconnects the render loop and hides the overlay. |
@@ -65,6 +68,33 @@ esp.Settings.Animations.Speed = 1.5
 
 The complete list of keys is documented in [configuration.md](configuration.md).
 
+## Focus
+
+Focus limits the ESP to one target. It is intended for autofarm and pathing scripts, where the destination is the only target that matters.
+
+```lua
+esp:SetTarget(player)              -- follows the character through a respawn
+esp:SetTarget(workspace.Bandit)    -- a humanoid NPC
+esp:SetTarget(workspace.Chest)     -- a tagged or plain Model
+esp:SetTarget(workspace.Marker)    -- a BasePart
+
+esp:SetTarget(workspace.NextChest) -- change the destination at runtime
+esp:ClearTarget()                  -- return to the normal target list
+```
+
+`SetTarget` accepts a `Player`, `Model`, `Humanoid` or `BasePart`. A Player or a player character is stored as a Player, so the entry follows a respawn. A Humanoid or a body part that belongs to a character resolves to that character. Any other Model or BasePart is drawn with the object element set.
+
+The method returns `true` when the target is accepted and `false` for an unsupported value, in which case the current target is unchanged. Passing `nil` clears the focus.
+
+While focus is active, every automatic selection rule is bypassed for the chosen instance:
+
+- `Filters`, `TeamCheck`, `IgnoreLocal`, `IncludeNPCs` and `Objects.Enabled` do not exclude it.
+- `MaxDistance`, `Objects.MaxDistance` and the level of detail thresholds do not remove or reduce it.
+- The visibility check does not hide it behind cover.
+- Humanoid targets keep the full element set. Object targets force the edge arrow on.
+
+Other targets retire through the normal animation path, so changing the target fades the old one out and the new one in. Focus is also exposed as `esp.Settings.Focus.Target`, and direct assignment to that key is picked up on the next frame.
+
 ## Presets
 
 `esp:ApplyPreset(name)` switches between the following looks:
@@ -77,7 +107,7 @@ The complete list of keys is documented in [configuration.md](configuration.md).
 - `Chams`
 - `Performance`
 
-A preset only replaces the appearance blocks: `Animations`, `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`, `Direction` and `Arrow`. Filters, level of detail thresholds, object matching and security keep their current values.
+A preset only replaces the appearance blocks: `Animations`, `Box`, `Name`, `Distance`, `Health`, `Tracer`, `Skeleton`, `HeadDot`, `Highlight`, `Direction` and `Arrow`. Filters, focus, level of detail thresholds, object matching and security keep their current values.
 
 `esp:ListPresets()` returns the names in sorted order. `Phasma.Presets.get(name)` returns the raw definition, and `Phasma.Presets.names()` returns the same sorted list.
 
@@ -123,6 +153,30 @@ local esp = Phasma:CreateESP({
 	},
 })
 ```
+
+### Focus an autofarm destination
+
+```lua
+local esp = Phasma:CreateESP({
+	MaxDistance = 1000,
+	Box = { Enabled = true },
+	Name = { Enabled = true },
+	Distance = { Enabled = true },
+})
+
+-- The farm loop chooses the next destination. Only that destination draws.
+local function moveTo(destination)
+	esp:SetTarget(destination)
+	-- Walk toward destination here.
+end
+
+moveTo(workspace:WaitForChild("Bandit"))
+moveTo(workspace:WaitForChild("Chest"))
+
+esp:ClearTarget()
+```
+
+A focused target ignores `MaxDistance` and the filters, so an autofarm destination is never dropped when it sits further away than the normal cutoff.
 
 ### Animation tuning
 

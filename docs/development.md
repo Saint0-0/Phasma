@@ -30,7 +30,7 @@ The style configuration lives in `stylua.toml`, and the lint configuration lives
 The build script bundles `src/Init.luau` into `dist/Phasma.luau` and builds `dist/Phasma.rbxm` from the same bundle. The version argument is required and must match `Constants.Version` in `src/Constants.luau`.
 
 ```powershell
-tools\lune.exe run build\init.luau 0.6.0
+tools\lune.exe run build\init.luau 0.7.0
 ```
 
 The output is ignored by Git. Release workflows attach the two files to a GitHub release instead of committing them.
@@ -76,13 +76,13 @@ The harness is not part of the library and is not required to build or verify a 
 ```powershell
 tools\stylua.exe src
 tools\selene.exe src
-tools\lune.exe run build\init.luau 0.6.0
+tools\lune.exe run build\init.luau 0.7.0
 
 git add -A
-git commit -m "prepare v0.6.0"
-git tag -a v0.6.0 -m "v0.6.0"
+git commit -m "prepare v0.7.0"
+git tag -a v0.7.0 -m "v0.7.0"
 git push origin main
-git push origin v0.6.0
+git push origin v0.7.0
 ```
 
 The `loadstring` URL in the README points at the latest release, so the two assets must use the exact file names `Phasma.luau` and `Phasma.rbxm`.

@@ -8,7 +8,7 @@
 
 local Constants = {}
 
-Constants.Version = "0.6.0"
+Constants.Version = "0.7.0"
 Constants.Name = "Phasma"
 
 -- Overlay identity. The GUI backend uses these for its ScreenGui unless
